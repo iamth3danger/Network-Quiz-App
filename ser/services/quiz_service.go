@@ -111,6 +111,11 @@ func (s *QuizService) FetchNewQuestion(ctx context.Context, examId int) (quiz.Qu
 	return quiz.Question{ID: question.ID, ObjectiveID: question.ObjectiveID, Question: question.Question, A: question.A, B: question.B, C: question.C, D: question.D, Answer: question.Answer, TermID: question.TermID}, nil
 }
 
+func (s *QuizService) SetQuizStatusReviewing(ctx context.Context, questionId int32) error {
+	_, err := s.queries.SetQuizStatusReviewing(ctx, pgtype.Int4{Int32: questionId, Valid: true})
+	return err
+}
+
 func (s *QuizService) GetQuizAnswered(ctx context.Context, objective float64) (QuizInfo, error) {
 	examId := s.examIdMap[objective]
 	count, err := s.queries.GetNumberAnswered(ctx, pgtype.Int4{Int32: int32(examId), Valid: true})
@@ -332,27 +337,38 @@ func (s *QuizService) GetQuestionSetByExamId(ctx context.Context, objectiveId fl
 	return s.queries.GetQuestionSetByExamId(ctx, pgtype.Int4{Int32: int32(examId), Valid: true})
 }
 
-func (s *QuizService) GetObjectiveRating(ctx context.Context) ([]ObjectiveRating, error) {
-	objectiveStats, err := s.queries.StatsByObjective(ctx)
-	var ratings []ObjectiveRating
+// func (s *QuizService) GetObjectiveRating(ctx context.Context) ([]ObjectiveRating, error) {
+// 	objectiveStats, err := s.queries.StatsByObjective(ctx)
+// 	var ratings []ObjectiveRating
+//
+// 	if err != nil {
+// 		return []ObjectiveRating{}, err
+// 	}
+//
+// 	for _, ob := range objectiveStats {
+//
+// 		stat := Stat{
+// 			total:   int(ob.NumRight + ob.NumWrong),
+// 			correct: float64(ob.NumRight) / float64(ob.NumRight+ob.NumWrong),
+// 			term:    float64(ob.NumTermsAttempted) / float64(ob.NumTerms),
+// 		}
+//
+// 		ratings = append(ratings, ObjectiveRating{
+// 			Code:  ob.Code,
+// 			Stars: getStarRating(stat),
+// 		})
+// 	}
+//
+// 	return ratings, nil
+// }
 
-	if err != nil {
-		return []ObjectiveRating{}, err
-	}
+func (s *QuizService) SaveQuizQuestions(ctx context.Context, reviewed Question, questions []Question) error {
+	_, err := s.queries.CreateQuizQuestion(ctx, quiz.CreateQuizQuestionParams{
+		QuestionID:  pgtype.Int4{Int32: reviewed.ID, Valid: true},
+		ObjectiveID: pgtype.Int4{Int32: reviewed.ObjectiveID, Valid: true},
+		Status:      quiz.NullQuestionStatus{QuestionStatus: quiz.QuestionStatusReviewing, Valid: true},
+	})
 
-	for _, ob := range objectiveStats {
-
-		stat := Stat{
-			total:   int(ob.NumRight + ob.NumWrong),
-			correct: float64(ob.NumRight) / float64(ob.NumRight+ob.NumWrong),
-			term:    float64(ob.NumTermsAttempted) / float64(ob.NumTerms),
-		}
-
-		ratings = append(ratings, ObjectiveRating{
-			Code:  ob.Code,
-			Stars: getStarRating(stat),
-		})
-	}
-
-	return ratings, nil
+	quizQuestion := makeBatchQuizQuestion(questions)
+	return s.queries.BatchQuizQuestion(ctx, quizQuestion)
 }

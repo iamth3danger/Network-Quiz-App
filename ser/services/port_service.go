@@ -14,6 +14,10 @@ type PortService struct {
 	queries *quiz.Queries
 }
 
+func (s *PortService) NewPortService(q *quiz.Queries) PortService {
+	return PortService{queries: q}
+}
+
 func (s *PortService) UpdatePorts(ctx context.Context, ports []MatchingRequest) error {
 	for _, port := range ports {
 		updateFunc := s.queries.UpdatePortScoreRight
@@ -123,3 +127,4 @@ func (s *PortService) GetMatchingQuiz(ctx context.Context) ([]quiz.GetMatchingQu
 
 	return s.queries.GetMatchingQuiz(ctx)
 }
+

@@ -306,6 +306,259 @@ func (q *Queries) FetchReviewQuestion(ctx context.Context, objectiveID pgtype.In
 	return i, err
 }
 
+const getAllExamObjectives = `-- name: GetAllExamObjectives :many
+SELECT id, code, description FROM exam_objectives
+`
+
+func (q *Queries) GetAllExamObjectives(ctx context.Context) ([]ExamObjective, error) {
+	rows, err := q.db.Query(ctx, getAllExamObjectives)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ExamObjective
+	for rows.Next() {
+		var i ExamObjective
+		if err := rows.Scan(&i.ID, &i.Code, &i.Description); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAllMatching = `-- name: GetAllMatching :many
+SELECT id, port_id FROM matching_quiz
+`
+
+func (q *Queries) GetAllMatching(ctx context.Context) ([]MatchingQuiz, error) {
+	rows, err := q.db.Query(ctx, getAllMatching)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []MatchingQuiz
+	for rows.Next() {
+		var i MatchingQuiz
+		if err := rows.Scan(&i.ID, &i.PortID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAllObjectiveScore = `-- name: GetAllObjectiveScore :many
+SELECT id, objective_id, right_count, wrong_count FROM objective_scores
+`
+
+func (q *Queries) GetAllObjectiveScore(ctx context.Context) ([]ObjectiveScore, error) {
+	rows, err := q.db.Query(ctx, getAllObjectiveScore)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ObjectiveScore
+	for rows.Next() {
+		var i ObjectiveScore
+		if err := rows.Scan(
+			&i.ID,
+			&i.ObjectiveID,
+			&i.RightCount,
+			&i.WrongCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAllPortScores = `-- name: GetAllPortScores :many
+SELECT id, port_id, right_count, wrong_count, streak FROM port_scores
+`
+
+func (q *Queries) GetAllPortScores(ctx context.Context) ([]PortScore, error) {
+	rows, err := q.db.Query(ctx, getAllPortScores)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PortScore
+	for rows.Next() {
+		var i PortScore
+		if err := rows.Scan(
+			&i.ID,
+			&i.PortID,
+			&i.RightCount,
+			&i.WrongCount,
+			&i.Streak,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAllPorts = `-- name: GetAllPorts :many
+SELECT id, abbreviation, port, protocol FROM ports
+`
+
+func (q *Queries) GetAllPorts(ctx context.Context) ([]Port, error) {
+	rows, err := q.db.Query(ctx, getAllPorts)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Port
+	for rows.Next() {
+		var i Port
+		if err := rows.Scan(
+			&i.ID,
+			&i.Abbreviation,
+			&i.Port,
+			&i.Protocol,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAllQuestions = `-- name: GetAllQuestions :many
+SELECT id, objective_id, question, a, b, c, d, answer, term_id FROM questions
+`
+
+func (q *Queries) GetAllQuestions(ctx context.Context) ([]Question, error) {
+	rows, err := q.db.Query(ctx, getAllQuestions)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Question
+	for rows.Next() {
+		var i Question
+		if err := rows.Scan(
+			&i.ID,
+			&i.ObjectiveID,
+			&i.Question,
+			&i.A,
+			&i.B,
+			&i.C,
+			&i.D,
+			&i.Answer,
+			&i.TermID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAllQuiz = `-- name: GetAllQuiz :many
+SELECT id, question_id, objective_id, status FROM quiz
+`
+
+func (q *Queries) GetAllQuiz(ctx context.Context) ([]Quiz, error) {
+	rows, err := q.db.Query(ctx, getAllQuiz)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Quiz
+	for rows.Next() {
+		var i Quiz
+		if err := rows.Scan(
+			&i.ID,
+			&i.QuestionID,
+			&i.ObjectiveID,
+			&i.Status,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAllScores = `-- name: GetAllScores :many
+SELECT id, question_id, right_count, wrong_count, streak FROM scores
+`
+
+func (q *Queries) GetAllScores(ctx context.Context) ([]Score, error) {
+	rows, err := q.db.Query(ctx, getAllScores)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Score
+	for rows.Next() {
+		var i Score
+		if err := rows.Scan(
+			&i.ID,
+			&i.QuestionID,
+			&i.RightCount,
+			&i.WrongCount,
+			&i.Streak,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAllTerms = `-- name: GetAllTerms :many
+SELECT id, objective_id, term_name FROM terms
+`
+
+func (q *Queries) GetAllTerms(ctx context.Context) ([]Term, error) {
+	rows, err := q.db.Query(ctx, getAllTerms)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Term
+	for rows.Next() {
+		var i Term
+		if err := rows.Scan(&i.ID, &i.ObjectiveID, &i.TermName); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getAllWrongQuestions = `-- name: GetAllWrongQuestions :many
 SELECT q.id, q.objective_id, q.question, q.a, q.b, q.c, q.d, q.answer, q.term_id FROM questions q 
 JOIN scores s on s.question_id = q.id 

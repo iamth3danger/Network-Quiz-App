@@ -45,13 +45,13 @@ func makeQuizRow(row quiz.GetQuestionsRow) QuizRow {
 	}
 }
 
-func makeBatchQuizQuestion(vals []QuizRow) quiz.BatchQuizQuestionParams {
+func makeBatchQuizQuestion(vals []Question) quiz.BatchQuizQuestionParams {
 	params := quiz.BatchQuizQuestionParams{}
 
 	for _, val := range vals {
 		// log.Printf("objective id %d", val.questionId)
-		params.ObjectiveIds = append(params.ObjectiveIds, val.objectiveId)
-		params.QuestionIds = append(params.QuestionIds, val.questionId)
+		params.ObjectiveIds = append(params.ObjectiveIds, val.ObjectiveID)
+		params.QuestionIds = append(params.QuestionIds, val.ID)
 		params.Status = append(params.Status, "pending")
 	}
 	return params

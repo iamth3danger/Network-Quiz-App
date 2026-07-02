@@ -176,6 +176,9 @@ WHERE s.wrong_count > 0
 AND s.streak = 0
 AND q.objective_id = $1;
 
+-- name: GetAllExamObjectives :many 
+SELECT * FROM exam_objectives;
+
 -- name: GetAllQuestions :many 
 SELECT * FROM questions;
 
@@ -188,11 +191,17 @@ SELECT * FROM quiz;
 -- name: GetAllPorts :many 
 SELECT * FROM ports;
 
--- name: GetAllTerms :many 
-SELECT * FROM quiz;
-
 -- name: GetAllPortScores :many 
 SELECT * FROM port_scores;
+
+-- name: GetAllTerms :many 
+SELECT * FROM terms;
+
+-- name: GetAllMatching :many
+SELECT * FROM matching_quiz;
+
+-- name: GetAllObjectiveScore :many
+SELECT * FROM objective_scores;
 
 -- name: CreatePorts :exec 
 INSERT INTO ports (abbreviation, port, protocol) VALUES (

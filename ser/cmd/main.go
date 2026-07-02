@@ -26,7 +26,10 @@ func (e ErrInvalidArg) Error() string {
 }
 
 type App struct {
-	quizService *services.QuizService
+	quizService  *services.QuizService
+	portService  *services.PortService
+	store        *services.Store
+	storeService *services.StoreService
 }
 
 const portNum string = ":8080"
@@ -85,7 +88,7 @@ func handleError(w http.ResponseWriter, err error) {
 }
 
 func (a *App) GetStarRating(w http.ResponseWriter, r *http.Request) {
-	ratings, err := a.quizService.GetObjectiveRating(r.Context())
+	ratings, err := a.store.GetObjectiveRating()
 	if err != nil {
 		handleError(w, err)
 		return
@@ -101,11 +104,19 @@ func (a *App) UpdateQuestion(w http.ResponseWriter, r *http.Request) {
 		handleError(w, err)
 		return
 	}
+
 	err = a.quizService.UpdateQuestion(r.Context(), req)
 	if err != nil {
 		handleError(w, err)
 		return
 	}
+	a.store, err = a.storeService.UpdateStoreOnQuestion(r.Context(), a.store)
+
+	if err != nil {
+		handleError(w, err)
+		return
+	}
+
 	WriteOk(w, http.StatusOK)
 }
 
@@ -117,7 +128,14 @@ func (a *App) UpdatePort(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = a.quizService.UpdatePorts(r.Context(), req)
+	err = a.portService.UpdatePorts(r.Context(), req)
+	if err != nil {
+		handleError(w, err)
+		return
+	}
+
+	a.store, err = a.storeService.UpdateStoreOnPort(r.Context(), a.store)
+
 	if err != nil {
 		handleError(w, err)
 		return
@@ -149,7 +167,7 @@ func (a *App) GetQuestionNumber(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	quizInfo, err := a.quizService.GetQuizAnswered(r.Context(), examObj)
+	quizInfo, err := a.store.GetQuizAnswered(examObj)
 
 	if err != nil {
 		handleError(w, err)
@@ -168,11 +186,18 @@ func (a *App) GetQuestion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	question, err := a.quizService.FetchQuestion(r.Context(), examObj)
+	question, err := a.store.FetchQuestion(examObj)
 	if err != nil {
 		handleError(w, err)
 		return
 	}
+
+	go func() {
+		err := a.quizService.SetQuizStatusReviewing(context.Background(), question.ID)
+		if err != nil {
+			log.Printf("failed to set quiz status: %v", err)
+		}
+	}()
 	writeJSON(w, http.StatusOK, question)
 }
 
@@ -190,23 +215,26 @@ func (a *App) GenerateQuiz(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := time.Now().UnixMilli()
-	err = a.quizService.GenerateQuiz(r.Context(), examObj)
+	questions, err := a.store.GenerateQuiz(examObj)
 	log.Printf("time taken to generate quiz %d", time.Now().UnixMilli()-now)
 
 	if err != nil {
 		handleError(w, err)
 	}
 
-	question, err := a.quizService.FetchQuestion(r.Context(), examObj)
-	if err != nil {
-		handleError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, question)
+	retQuestion := questions[0]
+	questions = questions[1:10]
+	go func() {
+		err := a.quizService.SaveQuizQuestions(context.Background(), retQuestion, questions)
+		if err != nil {
+			log.Printf("cooked %v", err)
+		}
+	}()
+	writeJSON(w, http.StatusOK, retQuestion)
 }
 
 func (a *App) GenerateMatching(w http.ResponseWriter, r *http.Request) {
-	matching, err := a.quizService.GetMatchingQuiz(r.Context())
+	matching, err := a.portService.GetMatchingQuiz(r.Context())
 	if err != nil {
 		handleError(w, err)
 	}
@@ -271,8 +299,18 @@ func main() {
 
 	ctx := context.Background()
 	db.Init("../.env")
-	app := App{quizService: services.NewQuizService()}
-	err := app.quizService.Init(ctx)
+	quizDB := quiz.New(db.DB)
+	storeService := services.NewStoreService(quizDB)
+	portService := services.NewPortService(quizDB)
+	store, err := storeService.NewStore(ctx)
+	if err != nil {
+		log.Fatalf("unable to generate store %w", err)
+		return
+	}
+
+	app := App{quizService: services.NewQuizService(), store: store, portService: &portService, storeService: &storeService}
+
+	err = app.quizService.Init(ctx)
 	if err != nil {
 		log.Fatalf("Error creating map %v", err)
 	}

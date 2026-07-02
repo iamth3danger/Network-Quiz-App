@@ -1,6 +1,7 @@
 package services
 
 import (
+	"dorzi/server/db/quiz"
 	"errors"
 )
 
@@ -37,8 +38,8 @@ type PortRead struct {
 }
 
 type ObjectiveRating struct {
-	Code  string `json:"code"`
-	Stars int    `json:"stars"`
+	Code  float64 `json:"code"`
+	Stars int     `json:"stars"`
 }
 
 type StarRating struct {
@@ -64,9 +65,24 @@ type ExamObjective struct {
 	Description string `json:"description"`
 }
 
+func examFromDB(examDb quiz.ExamObjective) ExamObjective {
+	return ExamObjective{
+		ID:          examDb.ID,
+		Code:        examDb.Code,
+		Description: examDb.Description,
+	}
+}
+
 type MatchingQuiz struct {
 	ID     int32 `json:"id"`
 	PortID int32 `json:"port_id"`
+}
+
+func matchingFromDB(matchingDb quiz.MatchingQuiz) MatchingQuiz {
+	return MatchingQuiz{
+		ID:     matchingDb.ID,
+		PortID: matchingDb.PortID.Int32,
+	}
 }
 
 type Score struct {
@@ -77,11 +93,38 @@ type Score struct {
 	Streak     int32 `json:"streak"`
 }
 
+func scoreFromDB(scoreDb quiz.Score) Score {
+	return Score{
+		ID:         scoreDb.ID,
+		QuestionID: scoreDb.QuestionID.Int32,
+		RightCount: scoreDb.RightCount.Int32,
+		WrongCount: scoreDb.WrongCount.Int32,
+		Streak:     scoreDb.Streak.Int32,
+	}
+}
+
 type ObjectiveScore struct {
 	ID          int32 `json:"id"`
 	ObjectiveID int32 `json:"objective_id"`
 	RightCount  int32 `json:"right_count"`
 	WrongCount  int32 `json:"wrong_count"`
+}
+
+type ObjectiveStat struct {
+	Code           float64
+	Right          int32
+	Wrong          int32
+	Terms          int32
+	AttemptedTerms int32
+}
+
+func objScoreFromDB(objScoreDb quiz.ObjectiveScore) ObjectiveScore {
+	return ObjectiveScore{
+		ID:          objScoreDb.ID,
+		ObjectiveID: objScoreDb.ObjectiveID.Int32,
+		RightCount:  objScoreDb.RightCount.Int32,
+		WrongCount:  objScoreDb.WrongCount.Int32,
+	}
 }
 
 type Port struct {
@@ -91,12 +134,31 @@ type Port struct {
 	Protocol     string `json:"protocol"`
 }
 
+func portFromDB(portDb quiz.Port) Port {
+	return Port{
+		ID:           portDb.ID,
+		Abbreviation: portDb.Abbreviation,
+		Port:         portDb.Port,
+		Protocol:     portDb.Protocol,
+	}
+}
+
 type PortScore struct {
 	ID         int32 `json:"id"`
 	PortID     int32 `json:"port_id"`
 	RightCount int32 `json:"right_count"`
 	WrongCount int32 `json:"wrong_count"`
 	Streak     int32 `json:"streak"`
+}
+
+func portScoreFromDB(portScoreDb quiz.PortScore) PortScore {
+	return PortScore{
+		ID:         portScoreDb.ID,
+		PortID:     portScoreDb.PortID.Int32,
+		RightCount: portScoreDb.RightCount.Int32,
+		WrongCount: portScoreDb.WrongCount.Int32,
+		Streak:     portScoreDb.Streak.Int32,
+	}
 }
 
 type Question struct {
@@ -111,6 +173,20 @@ type Question struct {
 	TermID      int32  `json:"term_id"`
 }
 
+func questionFromDB(questionDb quiz.Question) Question {
+	return Question{
+		ID:          questionDb.ID,
+		ObjectiveID: questionDb.ObjectiveID.Int32,
+		Question:    questionDb.Question,
+		A:           questionDb.A,
+		B:           questionDb.B,
+		C:           questionDb.C,
+		D:           questionDb.D,
+		Answer:      questionDb.Answer,
+		TermID:      questionDb.TermID.Int32,
+	}
+}
+
 type Quiz struct {
 	ID          int32  `json:"id"`
 	QuestionID  int32  `json:"question_id"`
@@ -118,10 +194,28 @@ type Quiz struct {
 	Status      string `json:"status"`
 }
 
+func quizFromDB(quizDb quiz.Quiz) Quiz {
+	return Quiz{
+		ID:          quizDb.ID,
+		QuestionID:  quizDb.QuestionID.Int32,
+		ObjectiveID: quizDb.ObjectiveID.Int32,
+		Status:      string(quizDb.Status.QuestionStatus),
+	}
+}
+
 type Term struct {
-	ID          int32       `json:"id"`
-	ObjectiveID pgtype.Int4 `json:"objective_id"`
-	TermName    string      `json:"term_name"`
+	ID          int32  `json:"id"`
+	ObjectiveID int32  `json:"objective_id"`
+	TermName    string `json:"term_name"`
+}
+
+func termFromDB(termDb quiz.Term) Term {
+	return Term{
+		ID:          termDb.ID,
+		ObjectiveID: termDb.ObjectiveID.Int32,
+		TermName:    termDb.TermName,
+	}
 }
 
 var ErrInvalidObjective = errors.New("invalid error objective")
+var ErrDBFetch = errors.New("fetching from db")
