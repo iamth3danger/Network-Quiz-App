@@ -23,7 +23,7 @@ type Store struct {
 }
 
 func (s *Store) FetchQuestion(objective float64) (Question, error) {
-	examId, err := s.getExamCodeById(objective)
+	examId, err := s.GetExamCodeById(objective)
 
 	if err != nil {
 		return Question{}, err
@@ -61,7 +61,7 @@ func (s *Store) FetchQuestion(objective float64) (Question, error) {
 }
 
 func (s *Store) GetQuizAnswered(objective float64) (QuizStatus, error) {
-	examId, err := s.getExamCodeById(objective)
+	examId, err := s.GetExamCodeById(objective)
 
 	if err != nil {
 		return QuizStatus{}, err
@@ -213,13 +213,13 @@ func (s *Store) setQuizQuestionAnswered(examId int32, questionID int32) error {
 	return s.setQuizQuestionStatus(examId, questionID, "answered")
 }
 
-func (s *Store) getExamCodeById(objective float64) (int32, error) {
+func (s *Store) GetExamCodeById(objective float64) (int32, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	examId, ok := s.examCodeId[objective]
 	if !ok {
-		return 0, fmt.Errorf("invalid exam objective: %.1f", objective)
+		return 0, fmt.Errorf("%w: %.1f", ErrInvalidObjective, objective)
 	}
 	return examId, nil
 }

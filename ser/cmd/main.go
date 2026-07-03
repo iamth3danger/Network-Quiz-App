@@ -221,7 +221,13 @@ func (a *App) GenerateQuiz(w http.ResponseWriter, r *http.Request) {
 	questions = questions[1:10]
 	go func() {
 		ctx := context.Background()
-		err := a.quizService.DeleteQuiz(ctx, examObj)
+		examId, err := a.store.GetExamCodeById(examObj)
+
+		if err != nil {
+			log.Printf("%v", err)
+		}
+
+		err = a.quizService.DeleteQuiz(ctx, examId)
 		if err != nil {
 			log.Printf("cooked %v", err)
 		}
@@ -267,50 +273,6 @@ func (a *App) GetTerms(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, termStats)
 }
 
-func (a *App) WrongInfo(w http.ResponseWriter, r *http.Request) {
-	var questions []quiz.Question
-	examObj, err := parseExamObjective(r)
-
-	switch {
-	case err == nil:
-		questions, err = a.quizService.GetWrongQuestionsByExam(r.Context(), examObj)
-		if err != nil {
-			handleError(w, err)
-			return
-		}
-	case errors.As(err, &ErrEmptyParam{}):
-		questions, err = a.quizService.GetAllWrongQuestions(r.Context())
-		if err != nil {
-			handleError(w, err)
-			return
-		}
-	default:
-		handleError(w, err)
-		return
-	}
-
-	w.Header().Set("Content-Type", "text/plain")
-	for _, q := range questions {
-		fmt.Fprintf(w, "A. %s\n", q.A)
-		fmt.Fprintf(w, "B. %s\n", q.B)
-		fmt.Fprintf(w, "C. %s\n", q.C)
-		fmt.Fprintf(w, "D. %s\n", q.D)
-	}
-}
-
-func (a *App) QuestionSetByExamId(w http.ResponseWriter, r *http.Request) {
-	examObj, err := parseExamObjective(r)
-	questions, err := a.quizService.GetQuestionSetByExamId(r.Context(), examObj)
-	if err != nil {
-		handleError(w, err)
-	}
-
-	w.Header().Set("Content-Type", "text/plain")
-	for _, q := range questions {
-		fmt.Fprintf(w, "%s\n", q)
-	}
-}
-
 func main() {
 
 	ctx := context.Background()
@@ -333,7 +295,6 @@ func main() {
 	http.HandleFunc("/terms", app.GetTerms)
 	http.HandleFunc("/rating", app.GetStarRating)
 	http.HandleFunc("/questions/generate", app.GenerateQuiz)
-	http.HandleFunc("/questions/set", app.QuestionSetByExamId)
 	http.HandleFunc("/questions", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
@@ -342,7 +303,6 @@ func main() {
 			app.UpdateQuestion(w, r)
 		}
 	})
-	http.HandleFunc("/wrong", app.WrongInfo)
 	http.HandleFunc("/matching", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:

@@ -106,10 +106,7 @@ func objScoreFromDB(objScoreDb quiz.ObjectiveScore) ObjectiveScore {
 }
 
 type QuizService struct {
-	queries     *quiz.Queries
-	examIdMap   map[float64]int
-	termIdMap   map[string]int
-	termExamMap map[int]int
+	queries *quiz.Queries
 }
 
 func NewQuizService(q *quiz.Queries) QuizService {
@@ -118,13 +115,8 @@ func NewQuizService(q *quiz.Queries) QuizService {
 	}
 }
 
-func (s *QuizService) DeleteQuiz(ctx context.Context, objective float64) error {
-	examId, ok := s.examIdMap[objective]
-	if !ok {
-		return fmt.Errorf("%w: %v", ErrInvalidObjective, objective)
-	}
-
-	return s.queries.DeleteQuizWithExamId(ctx, pgtype.Int4{Int32: int32(examId), Valid: true})
+func (s *QuizService) DeleteQuiz(ctx context.Context, examId int32) error {
+	return s.queries.DeleteQuizWithExamId(ctx, pgtype.Int4{Int32: examId, Valid: true})
 }
 
 func (s *QuizService) SetQuizStatusReviewing(ctx context.Context, questionId int32) error {
@@ -132,12 +124,8 @@ func (s *QuizService) SetQuizStatusReviewing(ctx context.Context, questionId int
 	return err
 }
 
-func (s *QuizService) GetQuestionCount(ctx context.Context, objective float64) (int64, error) {
-	examId, ok := s.examIdMap[objective]
-	if !ok {
-		return 0, fmt.Errorf("%w: %v", ErrInvalidObjective, objective)
-	}
-	return s.queries.GetQuestionCount(ctx, pgtype.Int4{Int32: int32(examId), Valid: true})
+func (s *QuizService) GetQuestionCount(ctx context.Context, examId int32) (int64, error) {
+	return s.queries.GetQuestionCount(ctx, pgtype.Int4{Int32: examId, Valid: true})
 }
 
 func (s *QuizService) SaveExamObj(ctx context.Context, params ExamObject) error {
@@ -192,9 +180,8 @@ func (s *QuizService) GetAllWrongQuestions(ctx context.Context) ([]quiz.Question
 	return s.queries.GetAllWrongQuestions(ctx)
 }
 
-func (s *QuizService) GetWrongQuestionsByExam(ctx context.Context, objective float64) ([]quiz.Question, error) {
-	examId := s.examIdMap[objective]
-	return s.queries.GetWrongQuestionsByExam(ctx, pgtype.Int4{Int32: int32(examId), Valid: true})
+func (s *QuizService) GetWrongQuestionsByExam(ctx context.Context, examId int32) ([]quiz.Question, error) {
+	return s.queries.GetWrongQuestionsByExam(ctx, pgtype.Int4{Int32: examId, Valid: true})
 }
 
 func (s *QuizService) createOrUpdateObjectiveScore(ctx context.Context, examID int, correct bool) (quiz.ObjectiveScore, error) {
