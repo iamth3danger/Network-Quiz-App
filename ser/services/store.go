@@ -47,6 +47,10 @@ func (s *Store) FetchQuestion(objective float64) (Question, error) {
 
 	}
 
+	if len(pending) == 0 {
+		return Question{}, ErrStoreNotExist
+	}
+
 	rand.Shuffle(len(pending), func(i, j int) {
 		pending[i], pending[j] = pending[j], pending[i]
 	})
@@ -183,7 +187,7 @@ func (s *Store) getQuizByExamId(examId int32) ([]Quiz, error) {
 	defer s.mu.RUnlock()
 	quiz, ok := s.quiz[examId]
 	if !ok {
-		return nil, fmt.Errorf("invalid exam id: %d", examId)
+		return nil, fmt.Errorf("%w: exam id %d", ErrStoreNotExist, examId)
 	}
 
 	return quiz, nil

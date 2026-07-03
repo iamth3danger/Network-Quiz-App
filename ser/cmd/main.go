@@ -84,6 +84,10 @@ func handleError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
+	if errors.Is(err, services.ErrStoreNotExist) {
+		writeError(w, http.StatusNotFound, err)
+		return
+	}
 	writeError(w, http.StatusInternalServerError, err)
 }
 
