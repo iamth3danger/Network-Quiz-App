@@ -240,9 +240,8 @@ func (s *QuizService) FetchTermStats(ctx context.Context) ([]quiz.TermStatsRow, 
 	return s.queries.TermStats(ctx)
 }
 
-func (s *QuizService) GetQuestionSetByExamId(ctx context.Context, objectiveId float64) ([]string, error) {
-	examId := s.examIdMap[objectiveId]
-	return s.queries.GetQuestionSetByExamId(ctx, pgtype.Int4{Int32: int32(examId), Valid: true})
+func (s *QuizService) GetQuestionSetByExamId(ctx context.Context, examId int32) ([]string, error) {
+	return s.queries.GetQuestionSetByExamId(ctx, pgtype.Int4{Int32: examId, Valid: true})
 }
 
 func (s *QuizService) SaveQuizQuestions(ctx context.Context, reviewed Question, questions []Question) error {
