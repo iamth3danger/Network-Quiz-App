@@ -209,9 +209,9 @@ func (a *App) GenerateQuiz(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	now := time.Now().UnixMilli()
+	now := time.Now().UnixNano()
 	questions, err := a.store.GenerateQuiz(examObj)
-	log.Printf("time taken to generate quiz %d", time.Now().UnixMilli()-now)
+	log.Printf("time taken to generate quiz %d", time.Now().UnixNano()-now)
 
 	if err != nil {
 		handleError(w, err)
