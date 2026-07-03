@@ -21,7 +21,7 @@ type MatchingRequest struct {
 	Correct bool `json:"correct"`
 }
 
-type QuizInfo struct {
+type QuizStatus struct {
 	Count int
 }
 
@@ -93,6 +93,22 @@ type Score struct {
 	Streak     int32 `json:"streak"`
 }
 
+func (s *Score) getId() int32 {
+	return s.ID
+}
+
+func (s *Score) getRight() int32 {
+	return s.RightCount
+}
+
+func (s *Score) getWrong() int32 {
+	return s.WrongCount
+}
+
+func (s *Score) getStreak() int32 {
+	return s.Streak
+}
+
 func scoreFromDB(scoreDb quiz.Score) Score {
 	return Score{
 		ID:         scoreDb.ID,
@@ -134,6 +150,10 @@ type Port struct {
 	Protocol     string `json:"protocol"`
 }
 
+func (p *Port) getId() int32 {
+	return p.ID
+}
+
 func portFromDB(portDb quiz.Port) Port {
 	return Port{
 		ID:           portDb.ID,
@@ -149,6 +169,22 @@ type PortScore struct {
 	RightCount int32 `json:"right_count"`
 	WrongCount int32 `json:"wrong_count"`
 	Streak     int32 `json:"streak"`
+}
+
+func (s *PortScore) getId() int32 {
+	return s.ID
+}
+
+func (s *PortScore) getRight() int32 {
+	return s.RightCount
+}
+
+func (s *PortScore) getWrong() int32 {
+	return s.WrongCount
+}
+
+func (s *PortScore) getStreak() int32 {
+	return s.Streak
 }
 
 func portScoreFromDB(portScoreDb quiz.PortScore) PortScore {
@@ -171,6 +207,10 @@ type Question struct {
 	D           string `json:"d"`
 	Answer      string `json:"answer"`
 	TermID      int32  `json:"term_id"`
+}
+
+func (q *Question) getId() int32 {
+	return q.ID
 }
 
 func questionFromDB(questionDb quiz.Question) Question {

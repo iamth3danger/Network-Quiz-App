@@ -1,10 +1,8 @@
 package services
 
 import (
-	"cmp"
 	"fmt"
 	"math/rand"
-	"slices"
 	"sync"
 )
 
@@ -13,11 +11,11 @@ type Store struct {
 	examCodeId      map[float64]int32
 	questions       map[int32]Question
 	questionExamId  map[int32][]Question
-	scores          map[int32]Score
+	scores          map[int32]Scorer
 	objectiveScores map[int32]ObjectiveScore
 	quiz            map[int32][]Quiz
-	ports           map[int32]Port
-	portScores      map[int32]PortScore
+	ports           []Port
+	portScores      map[int32]Scorer
 	terms           map[int32]Term
 	matchingQuiz    []MatchingQuiz
 	mu              sync.RWMutex
@@ -61,11 +59,11 @@ func (s *Store) FetchQuestion(objective float64) (Question, error) {
 	return s.getQuestionById(pending[0].QuestionID)
 }
 
-func (s *Store) GetQuizAnswered(objective float64) (QuizInfo, error) {
+func (s *Store) GetQuizAnswered(objective float64) (QuizStatus, error) {
 	examId, err := s.getExamCodeById(objective)
 
 	if err != nil {
-		return QuizInfo{}, err
+		return QuizStatus{}, err
 	}
 
 	quizQuestions, err := s.getQuizByExamId(examId)
@@ -76,76 +74,28 @@ func (s *Store) GetQuizAnswered(objective float64) (QuizInfo, error) {
 		}
 	}
 
-	return QuizInfo{Count: count}, nil
+	return QuizStatus{Count: count}, nil
 }
 
 func (s *Store) GenerateQuiz(objective float64) ([]Question, error) {
-	const MaxQuestions = 10
-	examId := s.examCodeId[objective]
-	questions := s.questionExamId[examId]
-
-	var newQuestions []Question
-	var reviewedQuestions []Question
-	var scores []Score
-	scoreQuestion := make(map[int32]Question)
-
-	for _, q := range questions {
-		score, ok := s.scores[q.ID]
-		if ok {
-			reviewedQuestions = append(reviewedQuestions, q)
-			scores = append(scores, score)
-			scoreQuestion[score.ID] = q
-		} else {
-			newQuestions = append(newQuestions, q)
-		}
+	examId, ok := s.examCodeId[objective]
+	if !ok {
+		return nil, fmt.Errorf("%w", ErrInvalidObjective)
 	}
+	questions := questToQuizer(s.questionExamId[examId])
 
-	slices.SortFunc(scores, func(a, b Score) int {
-		if n := cmp.Compare(a.Streak, b.Streak); n != 0 {
-			return n
-		}
-		aRatio := float64(a.RightCount) / max(float64(a.WrongCount), 1)
-		bRatio := float64(b.RightCount) / max(float64(b.WrongCount), 1)
-		return cmp.Compare(aRatio, bRatio)
-	})
+	info := createQuizerInfo(questions, s.scores)
+	info.rearrangeArrs()
 
-	rand.Shuffle(len(newQuestions), func(i, j int) {
-		newQuestions[i], newQuestions[j] = newQuestions[j], newQuestions[i]
-	})
+	return toQuestions(info.makeQuiz()), nil
+}
 
-	if len(reviewedQuestions) == 0 {
-		return newQuestions[0:10], nil
+func (s *Store) GenerateMatching() []Port {
+	ports := portToQuizer(s.ports)
+	info := createQuizerInfo(ports, s.portScores)
+	info.rearrangeArrs()
 
-	} else if len(newQuestions) == 0 {
-		return reviewedQuestions[0:10], nil
-	} else {
-		var quizVal []Question
-		numReviewQuestions := min(len(reviewedQuestions), 5)
-		streakCount := 0
-		for _, s := range scores[0:5] {
-			streakCount += int(s.Streak)
-		}
-
-		streakRatio := float64(streakCount) / float64(numReviewQuestions)
-		var numQuestions int
-		switch {
-		case streakCount == 0:
-			numQuestions = min(len(reviewedQuestions), 5)
-		case streakRatio <= 1.0:
-			numQuestions = min(len(reviewedQuestions), 3)
-		case streakRatio <= 1.5:
-			numQuestions = min(len(reviewedQuestions), 2)
-		default:
-			numQuestions = 1
-		}
-
-		quizVal = append(quizVal, reviewedQuestions[0:numQuestions]...)
-		numNewQuestions := min(len(newQuestions), MaxQuestions-numQuestions)
-		quizVal = append(quizVal, newQuestions[0:numNewQuestions]...)
-
-		return quizVal, nil
-	}
-
+	return toPorts(info.makeMatching())
 }
 
 func (s *Store) GetObjectiveRating() ([]ObjectiveRating, error) {
@@ -200,7 +150,7 @@ func (s *Store) createObjectiveStats() ([]ObjectiveStat, error) {
 		_, ok := terms[v.TermID]
 		examId, ex := s.examIdCode[v.ObjectiveID]
 		if !ex {
-			return nil, fmt.Errorf("fetching exam id %w", err)
+			return nil, fmt.Errorf("fetching exam id %d", v.ObjectiveID)
 		}
 
 		if !ok {
@@ -225,15 +175,6 @@ func (s *Store) createObjectiveStats() ([]ObjectiveStat, error) {
 	}
 
 	return objectiveStats, nil
-}
-
-func (s *Store) UpdateQuestion(question QuestionRequest) error {
-	s.updateScore(question)
-	err := s.updateObjectiveScore(question)
-	if err != nil {
-		return err
-	}
-	return s.setQuizQuestionAnswered(int32(question.QuestionID), int32(question.ExamObjectiveID))
 }
 
 func (s *Store) getQuizByExamId(examId int32) ([]Quiz, error) {
@@ -291,52 +232,6 @@ func (s *Store) getQuestionById(questionId int32) (Question, error) {
 		return Question{}, fmt.Errorf("invalid question id: %d", questionId)
 	}
 	return question, nil
-}
-
-func (s *Store) getScoreById(questionId int32) (Score, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	score, ok := s.scores[questionId]
-	if !ok {
-		return Score{}, fmt.Errorf("invalid question id: %d", questionId)
-	}
-	return score, nil
-}
-
-func (s *Store) updateScore(question QuestionRequest) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	score, ok := s.scores[int32(question.QuestionID)]
-	if !ok {
-		if question.Correct {
-			s.scores[int32(question.QuestionID)] = Score{
-				QuestionID: int32(question.QuestionID),
-				RightCount: 1,
-				WrongCount: 0,
-				Streak:     1,
-			}
-		} else {
-			s.scores[int32(question.QuestionID)] = Score{
-				QuestionID: int32(question.QuestionID),
-				RightCount: 0,
-				WrongCount: 1,
-				Streak:     0,
-			}
-		}
-		return
-	}
-
-	if question.Correct {
-		score.RightCount += 1
-		score.Streak += 1
-	} else {
-		score.WrongCount += 1
-		score.Streak = 0
-	}
-
-	s.scores[int32(question.QuestionID)] = score
 }
 
 func (s *Store) updateObjectiveScore(req QuestionRequest) error {

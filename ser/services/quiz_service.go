@@ -369,6 +369,10 @@ func (s *QuizService) SaveQuizQuestions(ctx context.Context, reviewed Question, 
 		Status:      quiz.NullQuestionStatus{QuestionStatus: quiz.QuestionStatusReviewing, Valid: true},
 	})
 
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrDBFetch, err)
+	}
+
 	quizQuestion := makeBatchQuizQuestion(questions)
 	return s.queries.BatchQuizQuestion(ctx, quizQuestion)
 }

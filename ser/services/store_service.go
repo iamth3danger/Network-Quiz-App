@@ -183,8 +183,8 @@ func (s *StoreService) fetchTerms(ctx context.Context) (map[int32]Term, error) {
 	return terms, nil
 }
 
-func (s *StoreService) fetchPorts(ctx context.Context) (map[int32]Port, error) {
-	ports := make(map[int32]Port)
+func (s *StoreService) fetchPorts(ctx context.Context) ([]Port, error) {
+	var ports []Port
 	portDb, err := s.queries.GetAllPorts(ctx)
 
 	if err != nil {
@@ -192,14 +192,14 @@ func (s *StoreService) fetchPorts(ctx context.Context) (map[int32]Port, error) {
 	}
 
 	for _, p := range portDb {
-		ports[p.ID] = portFromDB(p)
+		ports = append(ports, portFromDB(p))
 	}
 
 	return ports, nil
 }
 
-func (s *StoreService) fetchPortScores(ctx context.Context) (map[int32]PortScore, error) {
-	portScores := make(map[int32]PortScore)
+func (s *StoreService) fetchPortScores(ctx context.Context) (map[int32]Scorer, error) {
+	portScores := make(map[int32]Scorer)
 	portScoreDb, err := s.queries.GetAllPortScores(ctx)
 
 	if err != nil {
@@ -208,7 +208,7 @@ func (s *StoreService) fetchPortScores(ctx context.Context) (map[int32]PortScore
 
 	for _, p := range portScoreDb {
 		ps := portScoreFromDB(p)
-		portScores[ps.PortID] = ps
+		portScores[ps.PortID] = &ps
 	}
 
 	return portScores, nil
@@ -230,8 +230,8 @@ func (s *StoreService) fetchObjectiveScores(ctx context.Context) (map[int32]Obje
 	return objectiveScores, nil
 }
 
-func (s *StoreService) fetchScores(ctx context.Context) (map[int32]Score, error) {
-	scores := make(map[int32]Score)
+func (s *StoreService) fetchScores(ctx context.Context) (map[int32]Scorer, error) {
+	scores := make(map[int32]Scorer)
 	scoreDb, err := s.queries.GetAllScores(ctx)
 
 	if err != nil {
@@ -240,7 +240,7 @@ func (s *StoreService) fetchScores(ctx context.Context) (map[int32]Score, error)
 
 	for _, s := range scoreDb {
 		sc := scoreFromDB(s)
-		scores[sc.QuestionID] = sc
+		scores[sc.QuestionID] = &sc
 	}
 
 	return scores, nil
