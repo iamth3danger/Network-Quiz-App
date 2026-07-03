@@ -90,3 +90,4 @@ func termFromDB(termDb quiz.Term) Term {
 
 var ErrInvalidObjective = errors.New("invalid error objective")
 var ErrDBFetch = errors.New("fetching from db")
+var ErrStoreNotExist = errors.New("data not in store")

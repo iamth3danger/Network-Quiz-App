@@ -195,7 +195,7 @@ func (s *Store) setQuizQuestionStatus(examId int32, questionID int32, status str
 
 	quiz, ok := s.quiz[examId]
 	if !ok {
-		return fmt.Errorf("invalid exam id: %d", examId)
+		return fmt.Errorf("%w: quiz", ErrStoreNotExist)
 	}
 	for i, q := range quiz {
 		if q.ID == questionID {

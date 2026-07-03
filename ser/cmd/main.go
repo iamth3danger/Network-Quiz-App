@@ -76,7 +76,7 @@ func writeError(w http.ResponseWriter, status int, err error) {
 }
 
 func handleError(w http.ResponseWriter, err error) {
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, services.ErrStoreNotExist) {
 		writeError(w, http.StatusNotFound, err)
 		return
 	}
