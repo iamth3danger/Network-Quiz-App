@@ -65,19 +65,3 @@ func getStarRating(stat Stat) int {
 	}
 	return 0
 }
-
-func toQuestions(quizables []Quizable) []Question {
-	var questions []Question
-	for _, q := range quizables {
-		questions = append(questions, *(q.(*Question)))
-	}
-	return questions
-}
-
-func toQuizables(questions []Question) []Quizable {
-	var quizables []Quizable
-	for _, q := range questions {
-		quizables = append(quizables, &q)
-	}
-	return quizables
-}

@@ -30,7 +30,7 @@ func (s *StoreService) NewStore(ctx context.Context) (*Store, error) {
 	if err != nil {
 		return &Store{}, err
 	}
-	terms, err := s.fetchTerms(ctx)
+	termExamId, terms, err := s.fetchTerms(ctx)
 	if err != nil {
 		return &Store{}, err
 	}
@@ -62,6 +62,7 @@ func (s *StoreService) NewStore(ctx context.Context) (*Store, error) {
 		questionExamId:  questionExamId,
 		quiz:            quiz,
 		terms:           terms,
+		termExamId:      termExamId,
 		ports:           ports,
 		portScores:      portScores,
 		objectiveScores: objectiveScores,
@@ -109,6 +110,33 @@ func (s *StoreService) UpdateStoreOnPort(ctx context.Context, store *Store) (*St
 	return store, nil
 }
 
+func (s *StoreService) UpdateStoreOnQuiz(ctx context.Context, store *Store) (*Store, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	quiz, err := s.fetchQuiz(ctx)
+
+	if err != nil {
+		return nil, fmt.Errorf("%w : %w", ErrDBFetch, err)
+	}
+
+	store.quiz = quiz
+	return store, nil
+}
+
+func (s *StoreService) UpdateStoreOnMatching(ctx context.Context, store *Store) (*Store, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	matching, err := s.fetchMatchingQuiz(ctx)
+
+	if err != nil {
+		return nil, fmt.Errorf("%w : %w", ErrDBFetch, err)
+	}
+
+	store.matchingQuiz = matching
+	return store, nil
+}
 func (s *StoreService) fetchExamObjectives(ctx context.Context) (map[int32]float64, map[float64]int32, error) {
 	var examObjectives []ExamObjective
 	examIdCode := make(map[int32]float64)
@@ -168,19 +196,21 @@ func (s *StoreService) fetchQuiz(ctx context.Context) (map[int32][]Quiz, error) 
 	return quizQuestions, nil
 }
 
-func (s *StoreService) fetchTerms(ctx context.Context) (map[int32]Term, error) {
-	terms := make(map[int32]Term)
+func (s *StoreService) fetchTerms(ctx context.Context) (map[string]int32, map[string]int32, error) {
+	termExamId := make(map[string]int32)
+	terms := make(map[string]int32)
 	termDb, err := s.queries.GetAllTerms(ctx)
 
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrDBFetch, err)
+		return nil, nil, fmt.Errorf("%w: %w", ErrDBFetch, err)
 	}
 
 	for _, t := range termDb {
-		terms[t.ID] = termFromDB(t)
+		termExamId[t.TermName] = t.ObjectiveID.Int32
+		terms[t.TermName] = t.ID
 	}
 
-	return terms, nil
+	return termExamId, terms, nil
 }
 
 func (s *StoreService) fetchPorts(ctx context.Context) ([]Port, error) {

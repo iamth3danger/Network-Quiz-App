@@ -1,21 +1,102 @@
 package services
 
 import (
-	"cmp"
 	"context"
 	"dorzi/server/db/quiz"
-	"fmt"
 	"github.com/jackc/pgx/v5/pgtype"
-	"math/rand"
-	"slices"
 )
+
+type Port struct {
+	ID           int32  `json:"id"`
+	Abbreviation string `json:"abbreviation"`
+	Port         int32  `json:"port"`
+	Protocol     string `json:"protocol"`
+}
+
+func (p *Port) getId() int32 {
+	return p.ID
+}
+
+func portFromDB(portDb quiz.Port) Port {
+	return Port{
+		ID:           portDb.ID,
+		Abbreviation: portDb.Abbreviation,
+		Port:         portDb.Port,
+		Protocol:     portDb.Protocol,
+	}
+}
+
+type PortScore struct {
+	ID         int32 `json:"id"`
+	PortID     int32 `json:"port_id"`
+	RightCount int32 `json:"right_count"`
+	WrongCount int32 `json:"wrong_count"`
+	Streak     int32 `json:"streak"`
+}
+
+func (s *PortScore) getId() int32 {
+	return s.ID
+}
+
+func (s *PortScore) getRight() int32 {
+	return s.RightCount
+}
+
+func (s *PortScore) getWrong() int32 {
+	return s.WrongCount
+}
+
+func (s *PortScore) getStreak() int32 {
+	return s.Streak
+}
+
+func portScoreFromDB(portScoreDb quiz.PortScore) PortScore {
+	return PortScore{
+		ID:         portScoreDb.ID,
+		PortID:     portScoreDb.PortID.Int32,
+		RightCount: portScoreDb.RightCount.Int32,
+		WrongCount: portScoreDb.WrongCount.Int32,
+		Streak:     portScoreDb.Streak.Int32,
+	}
+}
+
+type MatchingQuiz struct {
+	ID     int32 `json:"id"`
+	PortID int32 `json:"port_id"`
+}
+
+func matchingFromDB(matchingDb quiz.MatchingQuiz) MatchingQuiz {
+	return MatchingQuiz{
+		ID:     matchingDb.ID,
+		PortID: matchingDb.PortID.Int32,
+	}
+}
+
+type PortRead struct {
+	Abbreviation string `json:"abbreviation"`
+	Name         string `json:"name"`
+	Port         int    `json:"port"`
+	Protocol     string `json:"protocol"`
+}
 
 type PortService struct {
 	queries *quiz.Queries
 }
 
-func (s *PortService) NewPortService(q *quiz.Queries) PortService {
+func NewPortService(q *quiz.Queries) PortService {
 	return PortService{queries: q}
+}
+
+func (s *PortService) SaveMatchingQuiz(ctx context.Context, ports []Port) error {
+	var portIds []int32
+	for _, p := range ports {
+		portIds = append(portIds, p.ID)
+	}
+	return s.queries.CreateMatchingQuiz(ctx, portIds)
+}
+
+func (s *PortService) DeleteMatchingQuiz(ctx context.Context) error {
+	return s.queries.DeleteMatchingQuiz(ctx)
 }
 
 func (s *PortService) UpdatePorts(ctx context.Context, ports []MatchingRequest) error {
@@ -34,97 +115,7 @@ func (s *PortService) UpdatePorts(ctx context.Context, ports []MatchingRequest) 
 	return nil
 }
 
-func (s *PortService) generateMatching(ctx context.Context) error {
-	const MaxQuestions = 10
-
-	portRow, err := s.queries.GetPorts(ctx)
-	if err != nil {
-		return err
-	}
-
-	var newPorts []quiz.GetPortsRow
-	var reviewedPorts []quiz.GetPortsRow
-
-	for _, port := range portRow {
-		if port.PortID.Int32 == 0 {
-			newPorts = append(newPorts, port)
-		} else {
-			reviewedPorts = append(reviewedPorts, port)
-		}
-	}
-
-	questionSize := min(len(portRow), MaxQuestions)
-	var quizIds []int32
-
-	slices.SortFunc(reviewedPorts, func(a, b quiz.GetPortsRow) int {
-		if n := cmp.Compare(a.Streak.Int32, b.Streak.Int32); n != 0 {
-			return n
-		}
-		aRatio := float64(a.RightCount.Int32) / max(float64(a.WrongCount.Int32), 1)
-		bRatio := float64(b.RightCount.Int32) / max(float64(b.WrongCount.Int32), 1)
-		return cmp.Compare(aRatio, bRatio)
-	})
-
-	rand.Shuffle(len(newPorts), func(i, j int) {
-		newPorts[i], newPorts[j] = newPorts[j], newPorts[i]
-	})
-
-	if len(reviewedPorts) == 0 {
-
-		for i := range questionSize {
-			quizIds = append(quizIds, newPorts[i].ID)
-		}
-	} else if len(newPorts) == 0 {
-		for i := range questionSize {
-			quizIds = append(quizIds, reviewedPorts[i].ID)
-		}
-	} else {
-		numReviewPorts := min(len(reviewedPorts), 5)
-		wrongCount := 0
-		for i := range numReviewPorts {
-			if reviewedPorts[i].WrongCount.Int32 > reviewedPorts[i].RightCount.Int32 {
-				wrongCount += 1
-			}
-		}
-
-		numQuestions := min(len(reviewedPorts), wrongCount)
-
-		for i := range numQuestions {
-			quizIds = append(quizIds, reviewedPorts[i].ID)
-		}
-
-		numNewQuestions := min(len(newPorts), MaxQuestions-numQuestions)
-
-		for i := range numNewQuestions {
-			quizIds = append(quizIds, newPorts[i].ID)
-		}
-	}
-
-	return s.queries.CreateMatchingQuiz(ctx, quizIds)
-
-}
-
 func (s *PortService) CreatePorts(ctx context.Context, ports []Port) error {
 	params := PortAsCreatePortsParam(ports)
 	return s.queries.CreatePorts(ctx, params)
 }
-
-func (s *PortService) GetMatchingQuiz(ctx context.Context) ([]quiz.GetMatchingQuizRow, error) {
-	avg, err := s.queries.GetAverageQuizStreak(ctx)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if avg >= 3 {
-		fmt.Print("creating new quiz \n")
-		err := s.queries.DeleteMatchingQuiz(ctx)
-		if err != nil {
-			return nil, err
-		}
-		err = s.generateMatching(ctx)
-	}
-
-	return s.queries.GetMatchingQuiz(ctx)
-}
-

@@ -15,6 +15,7 @@ LEFT JOIN scores s ON s.question_id = q.id
 WHERE s.question_id IS NULL
 AND q.objective_id = $1;
 
+
 -- name: GetQuestions :many
 SELECT q.id, q.objective_id, s.question_id, s.right_count, s.wrong_count, s.streak 
         FROM questions q 

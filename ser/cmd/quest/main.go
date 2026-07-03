@@ -4,36 +4,23 @@ import (
 	"context"
 	"dorzi/server/ai"
 	"dorzi/server/db"
+	"dorzi/server/db/quiz"
 	"dorzi/server/services"
 	"fmt"
 	"github.com/anthropics/anthropic-sdk-go"
-	"log"
-	"strconv"
-	"time"
 )
 
-func BuildQuestionSet(ctx context.Context, client anthropic.Client, service *services.QuizService) error {
+// BuildQuestionSet is probably buggy because store isn't updating terms on save or questions
+// If running again pls fix
 
+func BuildQuestionSet(ctx context.Context, client anthropic.Client, service *services.AIGenService, store *services.Store) error {
 	const MaxTermEmpty = 3
-	codes, err := service.GetExamCodes(ctx)
-	codeNum := make([]float64, len(codes))
-	if err != nil {
-		return err
-	}
 
-	for i := range codes {
-		cf, err := strconv.ParseFloat(codes[i], 64)
-		if err != nil {
-			return err
-		}
-		codeNum[i] = cf
-	}
-
-	for _, code := range codeNum {
+	for k, code := range store.GetExamIdCodes() {
 		termEmptyCount := 0
 
 		for {
-			req, err := service.GenerateRequest(ctx, code, 10)
+			req, err := service.GenerateRequest(ctx, code, int(k), 10)
 
 			for _, r := range req.ReviewTerms {
 				fmt.Printf("%v\n", r)
@@ -53,16 +40,17 @@ func BuildQuestionSet(ctx context.Context, client anthropic.Client, service *ser
 			}
 
 			for _, question := range questions {
-				start := time.Now()
-				_, err := service.SaveQuestion(ctx, question)
+				if !store.ValidateTerm(question.Term, k) {
+					return fmt.Errorf("term not in question examId")
+				}
+				_, err := service.SaveQuestion(ctx, question, k, store.GetTermId(question.Term))
 				if err != nil {
 					return err
 				}
-				log.Printf("Save Question took %v", time.Since(start))
 			}
 
 			if termEmptyCount < MaxTermEmpty {
-				terms, err := service.GetAllTerms(ctx, code)
+				terms, err := service.GetAllTerms(ctx, k)
 				if len(terms) >= 50 {
 					termEmptyCount = 5
 					continue
@@ -81,7 +69,7 @@ func BuildQuestionSet(ctx context.Context, client anthropic.Client, service *ser
 				}
 
 				for _, nt := range newTerms.Terms {
-					service.SaveTerm(ctx, nt, code)
+					service.SaveTerm(ctx, nt, k)
 				}
 
 				if len(newTerms.Terms) == 0 {
@@ -95,15 +83,21 @@ func BuildQuestionSet(ctx context.Context, client anthropic.Client, service *ser
 }
 
 func main() {
-	db.Init("../../.env")
-
-	quizService := services.NewQuizService()
-	client := anthropic.NewClient()
 	ctx := context.Background()
+	db.Init("../../.env")
+	quizDB := quiz.New(db.DB)
+	aiService := services.NewAIGenService(quizDB)
+	storeService := services.NewStoreService(quizDB)
+	store, err := storeService.NewStore(ctx)
 
-	quizService.Init(ctx)
-	err := BuildQuestionSet(ctx, client, quizService)
 	if err != nil {
-		fmt.Printf("%w\n", err)
+		fmt.Printf("%v\n", err)
+	}
+
+	client := anthropic.NewClient()
+
+	err = BuildQuestionSet(ctx, client, &aiService, store)
+	if err != nil {
+		fmt.Printf("%v\n", err)
 	}
 }

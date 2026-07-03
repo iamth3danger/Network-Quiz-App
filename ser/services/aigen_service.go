@@ -12,14 +12,16 @@ import (
 )
 
 type AIGenService struct {
-	queries     *quiz.Queries
-	examIdMap   map[float64]int
-	termIdMap   map[string]int
-	termExamMap map[int]int
+	queries *quiz.Queries
 }
 
-func (s *AIGenService) GenerateRequest(ctx context.Context, objective float64, numTerms int) (ai.AIRequest, error) {
-	examId := s.examIdMap[objective]
+func NewAIGenService(q *quiz.Queries) AIGenService {
+	return AIGenService{
+		queries: q,
+	}
+}
+
+func (s *AIGenService) GenerateRequest(ctx context.Context, objective float64, examId int, numTerms int) (ai.AIRequest, error) {
 
 	terms, err := s.getTerms(ctx, examId, numTerms)
 	if err != nil {
@@ -50,31 +52,7 @@ func (s *AIGenService) GenerateRequest(ctx context.Context, objective float64, n
 	}, nil
 }
 
-func (s *AIGenService) SaveQuestion(ctx context.Context, question ai.AIQuestion) (quiz.Question, error) {
-
-	objectiveId, ok := s.examIdMap[question.ExamObjective]
-	if !ok {
-		return quiz.Question{}, fmt.Errorf("%w: %v", ErrInvalidObjective, question.ExamObjective)
-	}
-
-	if question.Term == "" || question.Term == " " {
-		return quiz.Question{}, nil
-	}
-
-	termId, ok := s.termIdMap[strings.ToLower(question.Term)]
-	if !ok {
-		return quiz.Question{}, fmt.Errorf("getting id for %s %v", question.Term, ok)
-	}
-
-	termExamId, ok := s.termExamMap[termId]
-	if !ok {
-		return quiz.Question{}, fmt.Errorf("finding exam id for %s %v", termId, ok)
-	}
-
-	if termExamId != objectiveId {
-		fmt.Printf("examid %d not matching termId %d\n", objectiveId, termExamId)
-		return quiz.Question{}, nil
-	}
+func (s *AIGenService) SaveQuestion(ctx context.Context, question ai.AIQuestion, examId int32, termId int32) (quiz.Question, error) {
 
 	fmt.Printf("answer: %v\n", question.Answer)
 	params := quiz.CreateQuestionParams{
@@ -83,22 +61,12 @@ func (s *AIGenService) SaveQuestion(ctx context.Context, question ai.AIQuestion)
 		B:           question.B,
 		C:           question.C,
 		D:           question.D,
-		ObjectiveID: pgtype.Int4{Int32: int32(objectiveId), Valid: ok},
+		ObjectiveID: pgtype.Int4{Int32: examId, Valid: true},
 		Answer:      question.Answer,
-		TermID:      pgtype.Int4{Int32: int32(termId), Valid: ok},
+		TermID:      pgtype.Int4{Int32: int32(termId), Valid: true},
 	}
 
-	savedQ, err := s.queries.CreateQuestion(ctx, params)
-	if err != nil {
-		return quiz.Question{}, fmt.Errorf("inserting question %q: %w", question.Question, err)
-	}
-
-	err = s.createQuizQuestion(ctx, int(savedQ.ID), objectiveId)
-	if err != nil {
-		return quiz.Question{}, fmt.Errorf("creating quiz question for id %d: %w", savedQ.ID, err)
-	}
-
-	return savedQ, nil
+	return s.queries.CreateQuestion(ctx, params)
 }
 
 func (s *AIGenService) getTerms(ctx context.Context, examId int, numTerms int) ([]quiz.GetTermQuestionCountRow, error) {
@@ -134,23 +102,14 @@ func (s *AIGenService) getQuestionsByIds(ctx context.Context, termIds []int32) (
 	return s.queries.GetQuestionsByIds(ctx, termIds)
 }
 
-func (s *AIGenService) SaveTerm(ctx context.Context, termName string, objective float64) error {
-	examId := s.examIdMap[objective]
-	term, err := s.queries.CreateTerm(ctx, quiz.CreateTermParams{
+func (s *AIGenService) SaveTerm(ctx context.Context, termName string, examId int32) error {
+	_, err := s.queries.CreateTerm(ctx, quiz.CreateTermParams{
 		ObjectiveID: pgtype.Int4{Int32: int32(examId), Valid: true},
 		TermName:    strings.ToLower(termName),
 	})
-	if err != nil {
-		return err
-	}
-	if term.ID != 0 {
-		s.termIdMap[strings.ToLower(term.TermName)] = int(term.ID)
-		s.termExamMap[int(term.ID)] = int(term.ObjectiveID.Int32)
-	}
-	return nil
+	return err
 }
 
-func (s *AIGenService) GetAllTerms(ctx context.Context, objective float64) ([]string, error) {
-	examId := s.examIdMap[objective]
-	return s.queries.GetTermsByObjectiveId(ctx, pgtype.Int4{Int32: int32(examId), Valid: true})
+func (s *AIGenService) GetAllTerms(ctx context.Context, examId int32) ([]string, error) {
+	return s.queries.GetTermsByObjectiveId(ctx, pgtype.Int4{Int32: examId, Valid: true})
 }

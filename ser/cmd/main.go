@@ -209,11 +209,6 @@ func (a *App) GenerateQuiz(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = a.quizService.DeleteQuiz(r.Context(), examObj)
-	if err != nil {
-		handleError(w, err)
-	}
-
 	now := time.Now().UnixMilli()
 	questions, err := a.store.GenerateQuiz(examObj)
 	log.Printf("time taken to generate quiz %d", time.Now().UnixMilli()-now)
@@ -225,19 +220,40 @@ func (a *App) GenerateQuiz(w http.ResponseWriter, r *http.Request) {
 	retQuestion := questions[0]
 	questions = questions[1:10]
 	go func() {
-		err := a.quizService.SaveQuizQuestions(context.Background(), retQuestion, questions)
+		ctx := context.Background()
+		err := a.quizService.DeleteQuiz(ctx, examObj)
 		if err != nil {
 			log.Printf("cooked %v", err)
+		}
+		err = a.quizService.SaveQuizQuestions(ctx, retQuestion, questions)
+		if err != nil {
+			log.Printf("cooked %v", err)
+		}
+		a.store, err = a.storeService.UpdateStoreOnPort(ctx, a.store)
+		if err != nil {
+			log.Printf("%v", err)
 		}
 	}()
 	writeJSON(w, http.StatusOK, retQuestion)
 }
 
 func (a *App) GenerateMatching(w http.ResponseWriter, r *http.Request) {
-	matching, err := a.portService.GetMatchingQuiz(r.Context())
-	if err != nil {
-		handleError(w, err)
-	}
+	matching := a.store.GenerateMatching()
+
+	go func() {
+		ctx := context.Background()
+		err := a.portService.DeleteMatchingQuiz(ctx)
+		if err != nil {
+			log.Printf("deleting from db %v", err)
+		}
+
+		err = a.portService.SaveMatchingQuiz(ctx, matching)
+		if err != nil {
+			log.Printf("error saving to db %v", err)
+		}
+
+		a.store, err = a.storeService.UpdateStoreOnMatching(ctx, a.store)
+	}()
 
 	writeJSON(w, http.StatusOK, matching)
 }
@@ -302,18 +318,14 @@ func main() {
 	quizDB := quiz.New(db.DB)
 	storeService := services.NewStoreService(quizDB)
 	portService := services.NewPortService(quizDB)
+	quizService := services.NewQuizService(quizDB)
 	store, err := storeService.NewStore(ctx)
 	if err != nil {
-		log.Fatalf("unable to generate store %w", err)
+		log.Fatalf("unable to generate store %v", err)
 		return
 	}
 
-	app := App{quizService: services.NewQuizService(), store: store, portService: &portService, storeService: &storeService}
-
-	err = app.quizService.Init(ctx)
-	if err != nil {
-		log.Fatalf("Error creating map %v", err)
-	}
+	app := App{quizService: &quizService, store: store, portService: &portService, storeService: &storeService}
 
 	fmt.Println("Starting server")
 

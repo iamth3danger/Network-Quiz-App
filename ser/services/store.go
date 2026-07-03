@@ -16,7 +16,8 @@ type Store struct {
 	quiz            map[int32][]Quiz
 	ports           []Port
 	portScores      map[int32]Scorer
-	terms           map[int32]Term
+	termExamId      map[string]int32
+	terms           map[string]int32
 	matchingQuiz    []MatchingQuiz
 	mu              sync.RWMutex
 }
@@ -269,4 +270,20 @@ func (s *Store) updateObjectiveScore(req QuestionRequest) error {
 
 	s.objectiveScores[question.ID] = score
 	return nil
+}
+
+func (s *Store) GetExamIdCodes() map[int32]float64 {
+	return s.examIdCode
+}
+
+func (s *Store) ValidateTerm(termName string, examId int32) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.termExamId[termName] == examId
+}
+
+func (s *Store) GetTermId(termName string) int32 {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.terms[termName]
 }

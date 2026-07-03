@@ -1,20 +1,109 @@
 package services
 
 import (
-	"cmp"
 	"context"
-	"dorzi/server/db"
 	"dorzi/server/db/quiz"
 	"errors"
 	"fmt"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	"log"
-	"math/rand"
-	"slices"
-	"strconv"
-	"strings"
 )
+
+type Question struct {
+	ID          int32  `json:"id"`
+	ObjectiveID int32  `json:"objective_id"`
+	Question    string `json:"question"`
+	A           string `json:"a"`
+	B           string `json:"b"`
+	C           string `json:"c"`
+	D           string `json:"d"`
+	Answer      string `json:"answer"`
+	TermID      int32  `json:"term_id"`
+}
+
+func (q *Question) getId() int32 {
+	return q.ID
+}
+
+func questionFromDB(questionDb quiz.Question) Question {
+	return Question{
+		ID:          questionDb.ID,
+		ObjectiveID: questionDb.ObjectiveID.Int32,
+		Question:    questionDb.Question,
+		A:           questionDb.A,
+		B:           questionDb.B,
+		C:           questionDb.C,
+		D:           questionDb.D,
+		Answer:      questionDb.Answer,
+		TermID:      questionDb.TermID.Int32,
+	}
+}
+
+type Quiz struct {
+	ID          int32  `json:"id"`
+	QuestionID  int32  `json:"question_id"`
+	ObjectiveID int32  `json:"objective_id"`
+	Status      string `json:"status"`
+}
+
+func quizFromDB(quizDb quiz.Quiz) Quiz {
+	return Quiz{
+		ID:          quizDb.ID,
+		QuestionID:  quizDb.QuestionID.Int32,
+		ObjectiveID: quizDb.ObjectiveID.Int32,
+		Status:      string(quizDb.Status.QuestionStatus),
+	}
+}
+
+type Score struct {
+	ID         int32 `json:"id"`
+	QuestionID int32 `json:"question_id"`
+	RightCount int32 `json:"right_count"`
+	WrongCount int32 `json:"wrong_count"`
+	Streak     int32 `json:"streak"`
+}
+
+func (s *Score) getId() int32 {
+	return s.ID
+}
+
+func (s *Score) getRight() int32 {
+	return s.RightCount
+}
+
+func (s *Score) getWrong() int32 {
+	return s.WrongCount
+}
+
+func (s *Score) getStreak() int32 {
+	return s.Streak
+}
+
+func scoreFromDB(scoreDb quiz.Score) Score {
+	return Score{
+		ID:         scoreDb.ID,
+		QuestionID: scoreDb.QuestionID.Int32,
+		RightCount: scoreDb.RightCount.Int32,
+		WrongCount: scoreDb.WrongCount.Int32,
+		Streak:     scoreDb.Streak.Int32,
+	}
+}
+
+type ObjectiveScore struct {
+	ID          int32 `json:"id"`
+	ObjectiveID int32 `json:"objective_id"`
+	RightCount  int32 `json:"right_count"`
+	WrongCount  int32 `json:"wrong_count"`
+}
+
+func objScoreFromDB(objScoreDb quiz.ObjectiveScore) ObjectiveScore {
+	return ObjectiveScore{
+		ID:          objScoreDb.ID,
+		ObjectiveID: objScoreDb.ObjectiveID.Int32,
+		RightCount:  objScoreDb.RightCount.Int32,
+		WrongCount:  objScoreDb.WrongCount.Int32,
+	}
+}
 
 type QuizService struct {
 	queries     *quiz.Queries
@@ -23,51 +112,9 @@ type QuizService struct {
 	termExamMap map[int]int
 }
 
-func NewQuizService() *QuizService {
-	return &QuizService{
-		queries:     quiz.New(db.DB),
-		examIdMap:   make(map[float64]int),
-		termIdMap:   make(map[string]int),
-		termExamMap: make(map[int]int),
-	}
-}
-
-func (s *QuizService) Init(ctx context.Context) error {
-	terms, err := s.queries.GetTerms(ctx)
-	if err != nil {
-		return err
-	}
-
-	s.fillTerms(terms)
-	s.fillExamTermMap(terms)
-
-	return s.fillMap(ctx)
-}
-
-func (s *QuizService) fillMap(ctx context.Context) error {
-	examCodes, err := s.queries.GetExamIdsCodes(ctx)
-	if err != nil {
-		return err
-	}
-	for _, exam := range examCodes {
-		code, err := strconv.ParseFloat(exam.Code, 64)
-		if err != nil {
-			return fmt.Errorf("issue parsing float %w", err)
-		}
-		s.examIdMap[code] = int(exam.ID)
-	}
-	return nil
-}
-
-func (s *QuizService) fillTerms(terms []quiz.Term) {
-	for _, term := range terms {
-		s.termIdMap[strings.ToLower(term.TermName)] = int(term.ID)
-	}
-}
-
-func (s *QuizService) fillExamTermMap(terms []quiz.Term) {
-	for _, term := range terms {
-		s.termExamMap[int(term.ID)] = int(term.ObjectiveID.Int32)
+func NewQuizService(q *quiz.Queries) QuizService {
+	return QuizService{
+		queries: q,
 	}
 }
 
@@ -80,49 +127,9 @@ func (s *QuizService) DeleteQuiz(ctx context.Context, objective float64) error {
 	return s.queries.DeleteQuizWithExamId(ctx, pgtype.Int4{Int32: int32(examId), Valid: true})
 }
 
-func (s *QuizService) FetchQuestion(ctx context.Context, objective float64) (quiz.Question, error) {
-	examId, ok := s.examIdMap[objective]
-	if !ok {
-		return quiz.Question{}, fmt.Errorf("invalid exam objective: %w", objective)
-	}
-
-	question, err := s.queries.FetchReviewQuestion(ctx, pgtype.Int4{Int32: int32(examId), Valid: true})
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return s.FetchNewQuestion(ctx, examId)
-		}
-
-		return quiz.Question{}, fmt.Errorf("error fetching review question %w", err)
-	}
-
-	return quiz.Question{ID: question.ID, ObjectiveID: question.ObjectiveID, Question: question.Question, A: question.A, B: question.B, C: question.C, D: question.D, Answer: question.Answer, TermID: question.TermID}, nil
-}
-
-func (s *QuizService) FetchNewQuestion(ctx context.Context, examId int) (quiz.Question, error) {
-	question, err := s.queries.GetRandomQuestion(ctx, pgtype.Int4{Int32: int32(examId), Valid: true})
-	if err != nil {
-		return quiz.Question{}, err
-	}
-	_, err = s.queries.SetQuizStatusReviewing(ctx, pgtype.Int4{Int32: question.ID, Valid: true})
-	if err != nil {
-		return quiz.Question{}, err
-	}
-
-	return quiz.Question{ID: question.ID, ObjectiveID: question.ObjectiveID, Question: question.Question, A: question.A, B: question.B, C: question.C, D: question.D, Answer: question.Answer, TermID: question.TermID}, nil
-}
-
 func (s *QuizService) SetQuizStatusReviewing(ctx context.Context, questionId int32) error {
 	_, err := s.queries.SetQuizStatusReviewing(ctx, pgtype.Int4{Int32: questionId, Valid: true})
 	return err
-}
-
-func (s *QuizService) GetQuizAnswered(ctx context.Context, objective float64) (QuizInfo, error) {
-	examId := s.examIdMap[objective]
-	count, err := s.queries.GetNumberAnswered(ctx, pgtype.Int4{Int32: int32(examId), Valid: true})
-	if err != nil {
-		return QuizInfo{}, err
-	}
-	return QuizInfo{Count: int(count) + 1}, err
 }
 
 func (s *QuizService) GetQuestionCount(ctx context.Context, objective float64) (int64, error) {
@@ -215,92 +222,6 @@ func (s *QuizService) createOrUpdateObjectiveScore(ctx context.Context, examID i
 	return oScore, nil
 }
 
-func (s *QuizService) GenerateQuiz(ctx context.Context, objective float64) error {
-	const MaxQuestions = 10
-	examId := s.examIdMap[objective]
-
-	questionRow, err := s.queries.GetQuestions(ctx, pgtype.Int4{Int32: int32(examId), Valid: true})
-
-	if err != nil {
-		return err
-	}
-
-	var newQuestions []quiz.GetQuestionsRow
-	var reviewedQuestions []quiz.GetQuestionsRow
-
-	for _, question := range questionRow {
-		if question.QuestionID.Int32 == 0 {
-			newQuestions = append(newQuestions, question)
-		} else {
-			reviewedQuestions = append(reviewedQuestions, question)
-		}
-	}
-
-	questionSize := min(len(questionRow), MaxQuestions)
-	var quizVal []QuizRow
-
-	slices.SortFunc(reviewedQuestions, func(a, b quiz.GetQuestionsRow) int {
-		if n := cmp.Compare(a.Streak.Int32, b.Streak.Int32); n != 0 {
-			return n
-		}
-		aRatio := float64(a.RightCount.Int32) / max(float64(a.WrongCount.Int32), 1)
-		bRatio := float64(b.RightCount.Int32) / max(float64(b.WrongCount.Int32), 1)
-		return cmp.Compare(aRatio, bRatio)
-	})
-
-	rand.Shuffle(len(newQuestions), func(i, j int) {
-		newQuestions[i], newQuestions[j] = newQuestions[j], newQuestions[i]
-	})
-
-	if len(reviewedQuestions) == 0 {
-
-		for i := range questionSize {
-			quizVal = append(quizVal, makeQuizRow(newQuestions[i]))
-		}
-	} else if len(newQuestions) == 0 {
-		for i := range questionSize {
-			quizVal = append(quizVal, makeQuizRow(reviewedQuestions[i]))
-		}
-	} else {
-		numReviewQuestions := min(len(reviewedQuestions), 5)
-		streakCount := 0
-		for i := range numReviewQuestions {
-			streakCount += int(reviewedQuestions[i].Streak.Int32)
-		}
-
-		streakRatio := float64(streakCount) / float64(numReviewQuestions)
-		var numQuestions int
-		switch {
-		case streakCount == 0:
-			numQuestions = min(len(reviewedQuestions), 5)
-		case streakRatio <= 1.0:
-			numQuestions = min(len(reviewedQuestions), 3)
-		case streakRatio <= 1.5:
-			numQuestions = min(len(reviewedQuestions), 2)
-		default:
-			numQuestions = 1
-		}
-
-		for i := range numQuestions {
-			quizVal = append(quizVal, makeQuizRow(reviewedQuestions[i]))
-		}
-
-		numNewQuestions := min(len(newQuestions), MaxQuestions-numQuestions)
-
-		for i := range numNewQuestions {
-			quizVal = append(quizVal, makeQuizRow(newQuestions[i]))
-		}
-	}
-
-	return s.batchQuizQuestion(ctx, quizVal)
-}
-
-func (s *QuizService) batchQuizQuestion(ctx context.Context, quizVal []QuizRow) error {
-	batch := makeBatchQuizQuestion(quizVal)
-	log.Printf("batch %v\n", batch)
-	return s.queries.BatchQuizQuestion(ctx, batch)
-}
-
 func (s *QuizService) UpdateQuestion(ctx context.Context, question QuestionRequest) error {
 	qID := question.QuestionID
 	correct := question.Correct
@@ -336,31 +257,6 @@ func (s *QuizService) GetQuestionSetByExamId(ctx context.Context, objectiveId fl
 	examId := s.examIdMap[objectiveId]
 	return s.queries.GetQuestionSetByExamId(ctx, pgtype.Int4{Int32: int32(examId), Valid: true})
 }
-
-// func (s *QuizService) GetObjectiveRating(ctx context.Context) ([]ObjectiveRating, error) {
-// 	objectiveStats, err := s.queries.StatsByObjective(ctx)
-// 	var ratings []ObjectiveRating
-//
-// 	if err != nil {
-// 		return []ObjectiveRating{}, err
-// 	}
-//
-// 	for _, ob := range objectiveStats {
-//
-// 		stat := Stat{
-// 			total:   int(ob.NumRight + ob.NumWrong),
-// 			correct: float64(ob.NumRight) / float64(ob.NumRight+ob.NumWrong),
-// 			term:    float64(ob.NumTermsAttempted) / float64(ob.NumTerms),
-// 		}
-//
-// 		ratings = append(ratings, ObjectiveRating{
-// 			Code:  ob.Code,
-// 			Stars: getStarRating(stat),
-// 		})
-// 	}
-//
-// 	return ratings, nil
-// }
 
 func (s *QuizService) SaveQuizQuestions(ctx context.Context, reviewed Question, questions []Question) error {
 	_, err := s.queries.CreateQuizQuestion(ctx, quiz.CreateQuizQuestionParams{
