@@ -7,7 +7,7 @@ import (
 )
 
 const MaxQuestions = 10
-const MaxReviewSample = 10
+const MaxReviewSample = 5
 
 type Quizer interface {
 	getId() int32

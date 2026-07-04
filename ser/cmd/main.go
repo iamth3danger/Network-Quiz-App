@@ -239,7 +239,7 @@ func (a *App) GenerateQuiz(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Printf("cooked %v", err)
 		}
-		a.store, err = a.storeService.UpdateStoreOnPort(ctx, a.store)
+		a.store, err = a.storeService.UpdateStoreOnQuiz(ctx, a.store)
 		if err != nil {
 			log.Printf("%v", err)
 		}

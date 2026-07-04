@@ -38,6 +38,7 @@ func (s *StoreService) NewStore(ctx context.Context) (*Store, error) {
 	if err != nil {
 		return &Store{}, err
 	}
+
 	portScores, err := s.fetchPortScores(ctx)
 	if err != nil {
 		return &Store{}, err
