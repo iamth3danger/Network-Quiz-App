@@ -2,6 +2,7 @@ package services
 
 import (
 	"cmp"
+	"log"
 	"math/rand"
 	"slices"
 )
@@ -82,13 +83,16 @@ func (q *QuizInfo) shuffleQuizer() {
 }
 
 func (q *QuizInfo) make(getReviewableScore func() []Scorer) []Quizer {
+	var quizVal []Quizer
 	if len(q.reviewedQuizer) == 0 {
 		return q.newQuizer[0:10]
 
 	} else if len(q.newQuizer) == 0 {
-		return q.reviewedQuizer[0:10]
+		for _, s := range q.scores {
+			quizVal = append(quizVal, q.scoreQuizer[s.getId()])
+		}
+		return quizVal
 	} else {
-		var quizVal []Quizer
 
 		scores := getReviewableScore()
 		for _, s := range scores {

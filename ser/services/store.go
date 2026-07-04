@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	"log"
 	"math/rand"
 	"sync"
 )
@@ -99,8 +100,13 @@ func (s *Store) GenerateMatching() []Port {
 	ports := portToQuizer(s.ports)
 	info := createQuizerInfo(ports, s.portScores)
 	info.rearrangeArrs()
+	matchingPorts := toPorts(info.makeMatching())
 
-	return toPorts(info.makeMatching())
+	for _, p := range matchingPorts {
+		log.Printf("%v", p)
+	}
+
+	return matchingPorts
 }
 
 func (s *Store) GetObjectiveRating() ([]ObjectiveRating, error) {
