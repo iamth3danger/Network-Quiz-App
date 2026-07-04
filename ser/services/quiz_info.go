@@ -2,7 +2,6 @@ package services
 
 import (
 	"cmp"
-	"log"
 	"math/rand"
 	"slices"
 )
