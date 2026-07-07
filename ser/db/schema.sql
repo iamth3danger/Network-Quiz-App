@@ -11,7 +11,8 @@ CREATE TABLE IF NOT EXISTS exam_objectives (
 CREATE TABLE IF NOT EXISTS terms (
   id SERIAL PRIMARY KEY,
   objective_id INTEGER REFERENCES exam_objectives(id),
-  term_name TEXT NOT NULL
+  term_name TEXT NOT NULL,
+  on_exam boolean NOT NULL DEFAULT false
 );
 
 ALTER TABLE terms ADD CONSTRAINT terms_term_name_key UNIQUE (term_name);

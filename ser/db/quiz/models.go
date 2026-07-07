@@ -124,6 +124,7 @@ type Term struct {
 	ID          int32       `json:"id"`
 	ObjectiveID pgtype.Int4 `json:"objective_id"`
 	TermName    string      `json:"term_name"`
+	OnExam      bool        `json:"on_exam"`
 }
 
 type Turn struct {

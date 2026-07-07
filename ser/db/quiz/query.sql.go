@@ -218,7 +218,7 @@ const createTerm = `-- name: CreateTerm :one
 INSERT INTO terms (objective_id, term_name)
 VALUES ($1, $2)
 ON CONFLICT (term_name) DO NOTHING
-RETURNING id, objective_id, term_name
+RETURNING id, objective_id, term_name, on_exam
 `
 
 type CreateTermParams struct {
@@ -229,7 +229,12 @@ type CreateTermParams struct {
 func (q *Queries) CreateTerm(ctx context.Context, arg CreateTermParams) (Term, error) {
 	row := q.db.QueryRow(ctx, createTerm, arg.ObjectiveID, arg.TermName)
 	var i Term
-	err := row.Scan(&i.ID, &i.ObjectiveID, &i.TermName)
+	err := row.Scan(
+		&i.ID,
+		&i.ObjectiveID,
+		&i.TermName,
+		&i.OnExam,
+	)
 	return i, err
 }
 
@@ -443,7 +448,7 @@ func (q *Queries) GetAllPorts(ctx context.Context) ([]Port, error) {
 }
 
 const getAllQuestions = `-- name: GetAllQuestions :many
-SELECT id, objective_id, question, a, b, c, d, answer, term_id FROM questions
+SELECT q.id, q.objective_id, q.question, q.a, q.b, q.c, q.d, q.answer, q.term_id FROM questions q JOIN terms t ON t.id = q.term_id WHERE t.on_exam = true
 `
 
 func (q *Queries) GetAllQuestions(ctx context.Context) ([]Question, error) {
@@ -536,7 +541,7 @@ func (q *Queries) GetAllScores(ctx context.Context) ([]Score, error) {
 }
 
 const getAllTerms = `-- name: GetAllTerms :many
-SELECT id, objective_id, term_name FROM terms
+SELECT id, objective_id, term_name, on_exam FROM terms
 `
 
 func (q *Queries) GetAllTerms(ctx context.Context) ([]Term, error) {
@@ -548,7 +553,12 @@ func (q *Queries) GetAllTerms(ctx context.Context) ([]Term, error) {
 	var items []Term
 	for rows.Next() {
 		var i Term
-		if err := rows.Scan(&i.ID, &i.ObjectiveID, &i.TermName); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.ObjectiveID,
+			&i.TermName,
+			&i.OnExam,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -1152,7 +1162,7 @@ func (q *Queries) GetTermQuestionCount(ctx context.Context, objectiveID pgtype.I
 }
 
 const getTerms = `-- name: GetTerms :many
-SELECT id, objective_id, term_name FROM terms
+SELECT id, objective_id, term_name, on_exam FROM terms
 `
 
 func (q *Queries) GetTerms(ctx context.Context) ([]Term, error) {
@@ -1164,7 +1174,12 @@ func (q *Queries) GetTerms(ctx context.Context) ([]Term, error) {
 	var items []Term
 	for rows.Next() {
 		var i Term
-		if err := rows.Scan(&i.ID, &i.ObjectiveID, &i.TermName); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.ObjectiveID,
+			&i.TermName,
+			&i.OnExam,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

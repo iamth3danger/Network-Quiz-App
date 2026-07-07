@@ -181,7 +181,7 @@ AND q.objective_id = $1;
 SELECT * FROM exam_objectives;
 
 -- name: GetAllQuestions :many 
-SELECT * FROM questions;
+SELECT q.* FROM questions q JOIN terms t ON t.id = q.term_id WHERE t.on_exam = true;
 
 -- name: GetAllScores :many 
 SELECT * FROM scores;
