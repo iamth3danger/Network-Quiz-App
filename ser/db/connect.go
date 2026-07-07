@@ -7,15 +7,14 @@ import (
 	"os"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/joho/godotenv"
 )
 
 var DB *pgxpool.Pool
 
-func Init(envPath string) {
-	if err := godotenv.Load(envPath); err != nil {
-		log.Fatalf("Error loading .env file from %s: %v", envPath, err)
-	}
+func Init() {
+	// if err := godotenv.Load(envPath); err != nil {
+	// 	log.Fatalf("Error loading .env file from %s: %v", envPath, err)
+	// }
 
 	host := os.Getenv("POSTGRES_HOST")
 	port := os.Getenv("POSTGRES_PORT")

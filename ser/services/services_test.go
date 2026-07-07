@@ -1,6 +1,7 @@
 package services
 
 import (
+	"github.com/stretchr/testify/assert"
 	"reflect"
 	"testing"
 )
@@ -11,6 +12,12 @@ type mockScorer struct {
 	wrong  int32
 	streak int32
 }
+
+type mockQuizer struct {
+	id int32
+}
+
+func (m mockQuizer) getId() int32 { return m.id }
 
 func (m mockScorer) getId() int32     { return m.id }
 func (m mockScorer) getRight() int32  { return m.right }
@@ -86,4 +93,53 @@ func TestGetMatchingReviewableScores(t *testing.T) {
 			}
 		})
 	}
+
+}
+
+func mockToQuizer(mocks []mockQuizer) []Quizer {
+	var quizers []Quizer
+	for _, m := range mocks {
+		quizers = append(quizers, &m)
+	}
+
+	return quizers
+}
+
+func mockToScore(mocks []mockScorer) []Scorer {
+	var scorers []Scorer
+	for _, m := range mocks {
+		scorers = append(scorers, &m)
+	}
+
+	return scorers
+}
+
+func TestMakeMatching(t *testing.T) {
+	reviewMock := mockToQuizer([]mockQuizer{{id: 1}, {id: 2}, {id: 3}, {id: 4}, {id: 5}})
+	newMock := mockToQuizer([]mockQuizer{{id: 6}, {id: 7}, {id: 8}, {id: 9}, {id: 10}})
+	scoreMock := []mockScorer{{id: 1}, {id: 2}, {id: 3}, {id: 4}, {id: 5}}
+	for i := range scoreMock {
+		scoreMock[i].wrong = 2
+	}
+
+	scoreQuizer := map[int32]Quizer{
+		1: reviewMock[4],
+		2: reviewMock[2],
+		3: reviewMock[1],
+		4: reviewMock[3],
+		5: reviewMock[0],
+	}
+
+	item := QuizInfo{
+		reviewedQuizer: reviewMock,
+		newQuizer:      newMock,
+		scores:         mockToScore(scoreMock),
+		scoreQuizer:    scoreQuizer,
+	}
+
+	item.rearrangeArrs()
+	matchingQuiz := item.makeMatching()
+
+	assert.Equal(t, 10, len(matchingQuiz), "quiz length should be max length")
+
 }

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { apiUrl } from "@/lib/api";
 
 interface ApiError {
   status: number;
@@ -37,7 +38,7 @@ export default function QuizPage() {
   const fetchQuestionNumber = async () => {
     try {
       const res = await fetch(
-        `http://localhost:8080/quiz/count?exam_objective=${objectiveid}`,
+        apiUrl(`/quiz/count?exam_objective=${objectiveid}`),
       );
       const data = (await res.json()) as ApiResult<{ Count: number }>;
       if ("data" in data) {
@@ -55,12 +56,12 @@ export default function QuizPage() {
     await fetchQuestionNumber();
     try {
       let res = await fetch(
-        `http://localhost:8080/questions?exam_objective=${objectiveid}`,
+        apiUrl(`/questions?exam_objective=${objectiveid}`),
       );
       let data = (await res.json()) as ApiResult<Question>;
       if ("error" in data && data.status === 404) {
         res = await fetch(
-          `http://localhost:8080/questions/generate?exam_objective=${objectiveid}`,
+          apiUrl(`/questions/generate?exam_objective=${objectiveid}`),
           { method: "POST" },
         );
         data = (await res.json()) as ApiResult<Question>;
@@ -85,7 +86,7 @@ export default function QuizPage() {
     e.preventDefault();
     if (!selected || !question) return;
 
-    await fetch("http://localhost:8080/questions", {
+    await fetch(apiUrl("/questions"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

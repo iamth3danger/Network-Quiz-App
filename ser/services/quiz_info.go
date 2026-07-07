@@ -84,10 +84,10 @@ func (q *QuizInfo) shuffleQuizer() {
 func (q *QuizInfo) make(getReviewableScore func() []Scorer) []Quizer {
 	var quizVal []Quizer
 	if len(q.reviewedQuizer) == 0 {
-		return q.newQuizer[0:10]
+		return q.newQuizer[0:MaxQuestions]
 
 	} else if len(q.newQuizer) == 0 {
-		for _, s := range q.scores {
+		for _, s := range q.scores[0:MaxQuestions] {
 			quizVal = append(quizVal, q.scoreQuizer[s.getId()])
 		}
 		return quizVal

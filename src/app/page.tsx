@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { apiUrl } from "@/lib/api";
 
 interface Objective {
   code: string;
@@ -137,14 +138,14 @@ export default function Home() {
   const [ratings, setRatings] = useState<ObjectiveRating[]>([]);
 
   useEffect(() => {
-    fetch("http://localhost:8080/terms")
+    fetch(apiUrl("/terms"))
       .then((res) => res.json())
       .then((data) => {
         if (data.data) setTermStats(data.data);
       })
       .catch(console.error);
 
-    fetch("http://localhost:8080/rating")
+    fetch(apiUrl("/rating"))
       .then((res) => res.json())
       .then((data) => {
         if (data.data) setRatings(data.data);

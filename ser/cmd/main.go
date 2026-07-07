@@ -280,7 +280,7 @@ func (a *App) GetTerms(w http.ResponseWriter, r *http.Request) {
 func main() {
 
 	ctx := context.Background()
-	db.Init("../.env")
+	db.Init()
 	quizDB := quiz.New(db.DB)
 	storeService := services.NewStoreService(quizDB)
 	portService := services.NewPortService(quizDB)

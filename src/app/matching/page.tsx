@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { apiUrl } from "@/lib/api";
 
 interface MatchingRow {
   id: number;
@@ -45,7 +46,7 @@ export default function MatchingPage() {
     setWrongRecorded(new Set());
     setDone(false);
     try {
-      const res = await fetch("http://localhost:8080/matching/generate");
+      const res = await fetch(apiUrl("/matching/generate"));
       const data = await res.json();
       const items: MatchingRow[] = data.data ?? data;
       setRows(shuffle(items));
@@ -79,7 +80,7 @@ export default function MatchingPage() {
         if (newMatched.size === rows.length) {
           setResults(newResults);
           setDone(true);
-          fetch("http://localhost:8080/matching", {
+          fetch(apiUrl("/matching"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(newResults),
