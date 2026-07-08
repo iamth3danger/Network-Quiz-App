@@ -222,7 +222,7 @@ func (a *App) GenerateQuiz(w http.ResponseWriter, r *http.Request) {
 	}
 
 	retQuestion := questions[0]
-	questions = questions[1:10]
+	questions = questions[1:]
 	go func() {
 		ctx := context.Background()
 		examId, err := a.store.GetExamCodeById(examObj)

@@ -84,10 +84,14 @@ func (q *QuizInfo) shuffleQuizer() {
 func (q *QuizInfo) make(getReviewableScore func() []Scorer) []Quizer {
 	var quizVal []Quizer
 	if len(q.reviewedQuizer) == 0 {
-		return q.newQuizer[0:MaxQuestions]
+		if len(q.newQuizer) > MaxQuestions {
+			return q.newQuizer[:MaxQuestions]
+		} else {
+			return q.newQuizer
+		}
 
 	} else if len(q.newQuizer) == 0 {
-		for _, s := range q.scores[0:MaxQuestions] {
+		for _, s := range q.scores[:MaxQuestions] {
 			quizVal = append(quizVal, q.scoreQuizer[s.getId()])
 		}
 		return quizVal
@@ -98,7 +102,7 @@ func (q *QuizInfo) make(getReviewableScore func() []Scorer) []Quizer {
 			quizVal = append(quizVal, q.scoreQuizer[s.getId()])
 		}
 		numNewQuestions := min(len(q.newQuizer), MaxQuestions-len(scores))
-		quizVal = append(quizVal, q.newQuizer[0:numNewQuestions]...)
+		quizVal = append(quizVal, q.newQuizer[:numNewQuestions]...)
 		return quizVal
 	}
 }
@@ -106,7 +110,8 @@ func (q *QuizInfo) make(getReviewableScore func() []Scorer) []Quizer {
 func (q *QuizInfo) getQuizReviewableScores() []Scorer {
 	numReviewQuestions := min(len(q.reviewedQuizer), MaxReviewSample)
 	streakCount := 0
-	for _, s := range q.scores[0:MaxReviewSample] {
+
+	for _, s := range q.scores[:numReviewQuestions] {
 		streakCount += int(s.getStreak())
 	}
 
@@ -114,7 +119,7 @@ func (q *QuizInfo) getQuizReviewableScores() []Scorer {
 	var reviewNum int
 	switch {
 	case streakCount == 0:
-		reviewNum = min(len(q.reviewedQuizer), MaxReviewSample)
+		reviewNum = numReviewQuestions
 	case streakRatio <= 1.0:
 		reviewNum = min(len(q.reviewedQuizer), 3)
 	case streakRatio <= 1.5:
@@ -123,18 +128,19 @@ func (q *QuizInfo) getQuizReviewableScores() []Scorer {
 		reviewNum = 1
 	}
 
-	return q.scores[0:reviewNum]
+	return q.scores[:reviewNum]
 }
 
 func (q *QuizInfo) getMatchingReviewableScores() []Scorer {
 	wrongCount := 0
-	for _, s := range q.scores[0:MaxReviewSample] {
+	reviewSample := min(len(q.scores), MaxReviewSample)
+	for _, s := range q.scores[:reviewSample] {
 		if s.getWrong() > s.getRight() {
 			wrongCount += 1
 		}
 	}
 
-	return q.scores[0:wrongCount]
+	return q.scores[:wrongCount]
 }
 
 func (q *QuizInfo) makeQuiz() []Quizer {
