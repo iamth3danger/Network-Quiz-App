@@ -17,13 +17,13 @@ const QuestionIter = 3
 
 func getAnswer(answer int32) string {
 	switch answer {
-	case 1:
+	case 0:
 		return "a"
-	case 2:
+	case 1:
 		return "b"
-	case 3:
+	case 2:
 		return "c"
-	case 4:
+	case 3:
 		return "d"
 	default:
 		return "a"
@@ -31,7 +31,7 @@ func getAnswer(answer int32) string {
 }
 
 func CidrToSubnet(cidr int32) string {
-	mask := uint32(0xFFFFFF) << (32 - uint32(cidr))
+	mask := uint32(0xFFFFFFFF) << (32 - uint32(cidr))
 	octects := make([]string, 4)
 
 	for i := 3; i >= 0; i-- {

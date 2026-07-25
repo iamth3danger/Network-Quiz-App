@@ -178,6 +178,31 @@ func extractCIDRPrefix(cidr string) (int, error) {
 	return prefix, nil
 }
 
+func extractSubnetMask(s string) string {
+	re := regexp.MustCompile(`\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b`)
+	matches := re.FindStringSubmatch(s)
+	if len(matches) > 1 {
+		return matches[1]
+	}
+	return ""
+}
+
+func assertSubnet(expected string, actual string, t *testing.T) {
+	if expected != actual {
+		t.Fatalf("expected subnet %s actual subnet %s", expected, actual)
+	}
+}
+
+func TestCidrToSubnet(t *testing.T) {
+	assertSubnet("0.0.0.0", CidrToSubnet(0), t)
+	assertSubnet("224.0.0.0", CidrToSubnet(3), t)
+	assertSubnet("255.224.0.0", CidrToSubnet(11), t)
+	assertSubnet("255.252.0.0", CidrToSubnet(14), t)
+	assertSubnet("255.255.192.0", CidrToSubnet(18), t)
+	assertSubnet("255.255.252.0", CidrToSubnet(22), t)
+	assertSubnet("255.255.255.240", CidrToSubnet(28), t)
+}
+
 func TestCidrToSubnetQuestion(t *testing.T) {
 	question := CidrToSubnetQuestion()
 	answerStr, err := getAnswerStr(question)
@@ -194,5 +219,30 @@ func TestCidrToSubnetQuestion(t *testing.T) {
 
 	if answerStr != subnet {
 		t.Fatalf("answer is %s while computed subnet %s", answerStr, subnet)
+	}
+}
+
+func TestSubnetToCidrQuestion(t *testing.T) {
+	question := SubnetToCidrQuestion()
+	answerStr, err := getAnswerStr(question)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	cidr, err := extractCIDRPrefix(answerStr)
+
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	mask := extractSubnetMask(question.Question)
+	if mask == "" {
+		t.Fatalf("subnet mask not extracted!")
+	}
+
+	answerMask := CidrToSubnet(int32(cidr))
+
+	if answerMask != mask {
+		t.Fatalf("answer is %s while computed subnet %s", answerMask, mask)
 	}
 }
