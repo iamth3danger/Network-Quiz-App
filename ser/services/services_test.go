@@ -1,8 +1,11 @@
 package services
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"reflect"
+	"regexp"
+	"strconv"
 	"testing"
 )
 
@@ -142,4 +145,54 @@ func TestMakeMatching(t *testing.T) {
 
 	assert.Equal(t, 10, len(matchingQuiz), "quiz length should be max length")
 
+}
+
+func getAnswerStr(question Question) (string, error) {
+	switch question.Answer {
+	case "a":
+		return question.A, nil
+	case "b":
+		return question.B, nil
+	case "c":
+		return question.C, nil
+	case "d":
+		return question.D, nil
+	default:
+		return "", fmt.Errorf("Question in wrong format!")
+	}
+}
+
+func extractCIDRPrefix(cidr string) (int, error) {
+	re := regexp.MustCompile(`/(\d+)`)
+	matches := re.FindStringSubmatch(cidr)
+
+	if len(matches) < 2 {
+		return 0, fmt.Errorf("no CIDR prefix found in %s", cidr)
+	}
+
+	prefix, err := strconv.Atoi(matches[1])
+	if err != nil {
+		return 0, fmt.Errorf("invalid prefix: %v", err)
+	}
+
+	return prefix, nil
+}
+
+func TestCidrToSubnetQuestion(t *testing.T) {
+	question := CidrToSubnetQuestion()
+	answerStr, err := getAnswerStr(question)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	cidr, err := extractCIDRPrefix(question.Question)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	subnet := CidrToSubnet(int32(cidr))
+
+	if answerStr != subnet {
+		t.Fatalf("answer is %s while computed subnet %s", answerStr, subnet)
+	}
 }
