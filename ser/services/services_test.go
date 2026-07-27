@@ -246,3 +246,98 @@ func TestSubnetToCidrQuestion(t *testing.T) {
 		t.Fatalf("answer is %s while computed subnet %s", answerMask, mask)
 	}
 }
+
+func TestIPCidrToNetwork(t *testing.T) {
+	network, err := IPCidrToNetwork("192.68.44.37", 28)
+	if err != nil {
+		t.Fatalf("%v\n", err)
+	}
+	assertSubnet("192.68.44.32", network, t)
+
+	network, err = IPCidrToNetwork("72.102.249.1", 23)
+	if err != nil {
+		t.Fatalf("%v\n", err)
+	}
+	assertSubnet("72.102.248.0", network, t)
+
+	network, err = IPCidrToNetwork("151.72.48.210", 21)
+	if err != nil {
+		t.Fatalf("%v\n", err)
+	}
+	assertSubnet("151.72.48.0", network, t)
+
+	network, err = IPCidrToNetwork("151.72.48.210", 5)
+	if err != nil {
+		t.Fatalf("%v\n", err)
+	}
+	assertSubnet("144.0.0.0", network, t)
+
+	network, err = IPCidrToNetwork("151.72.48.210", 9)
+	if err != nil {
+		t.Fatalf("%v\n", err)
+	}
+	assertSubnet("151.0.0.0", network, t)
+
+	network, err = IPCidrToNetwork("151.72.48.210", 12)
+	if err != nil {
+		t.Fatalf("%v\n", err)
+	}
+	assertSubnet("151.64.0.0", network, t)
+
+	network, err = IPCidrToNetwork("151.72.48.210", 18)
+	if err != nil {
+		t.Fatalf("%v\n", err)
+	}
+	assertSubnet("151.72.0.0", network, t)
+
+	network, err = IPCidrToNetwork("151.72.48.210", 24)
+	if err != nil {
+		t.Fatalf("%v\n", err)
+	}
+	assertSubnet("151.72.48.0", network, t)
+
+}
+
+func TestIPCidrToBroadcast(t *testing.T) {
+	broadcast, err := IPCidrToBroadcast("192.68.44.37", 28)
+	if err != nil {
+		t.Fatalf("%v\n", err)
+	}
+	assertSubnet("192.68.44.47", broadcast, t)
+	broadcast, err = IPCidrToBroadcast("72.102.249.1", 23)
+	if err != nil {
+		t.Fatalf("%v\n", err)
+	}
+	assertSubnet("72.102.249.255", broadcast, t)
+
+	broadcast, err = IPCidrToBroadcast("151.72.48.210", 21)
+	if err != nil {
+		t.Fatalf("%v\n", err)
+	}
+	assertSubnet("151.72.55.255", broadcast, t)
+
+	broadcast, err = IPCidrToBroadcast("151.72.55.210", 9)
+	if err != nil {
+		t.Fatalf("%v\n", err)
+	}
+	assertSubnet("151.127.255.255", broadcast, t)
+
+	broadcast, err = IPCidrToBroadcast("151.72.48.210", 12)
+	if err != nil {
+		t.Fatalf("%v\n", err)
+	}
+	assertSubnet("151.79.255.255", broadcast, t)
+
+	broadcast, err = IPCidrToBroadcast("151.72.48.210", 18)
+	if err != nil {
+		t.Fatalf("%v\n", err)
+	}
+	assertSubnet("151.72.63.255", broadcast, t)
+
+	broadcast, err = IPCidrToBroadcast("151.72.48.210", 24)
+	if err != nil {
+		t.Fatalf("%v\n", err)
+	}
+	assertSubnet("151.72.48.255", broadcast, t)
+
+}
