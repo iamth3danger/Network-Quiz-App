@@ -255,7 +255,7 @@ func TestIPConversionQuestion(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 
-	net, err := IPCidrToNetwork(ip, cidr)
+	net, err := DottedDecimal(IPCidrToNetwork(ip, cidr)).string()
 
 	assertSubnet(net, answerStr, t)
 }
@@ -312,7 +312,7 @@ func TestIPCidrToNetwork(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
-	network, err := IPCidrToNetwork(ip, 28)
+	network, err := DottedDecimal(IPCidrToNetwork(ip, 28)).string()
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -322,7 +322,7 @@ func TestIPCidrToNetwork(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
-	network, err = IPCidrToNetwork(ip, 23)
+	network, err = DottedDecimal(IPCidrToNetwork(ip, 23)).string()
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -332,7 +332,7 @@ func TestIPCidrToNetwork(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
-	network, err = IPCidrToNetwork(ip, 21)
+	network, err = DottedDecimal(IPCidrToNetwork(ip, 21)).string()
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -342,7 +342,7 @@ func TestIPCidrToNetwork(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
-	network, err = IPCidrToNetwork(ip, 5)
+	network, err = DottedDecimal(IPCidrToNetwork(ip, 5)).string()
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -352,7 +352,7 @@ func TestIPCidrToNetwork(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
-	network, err = IPCidrToNetwork(ip, 9)
+	network, err = DottedDecimal(IPCidrToNetwork(ip, 9)).string()
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -362,7 +362,7 @@ func TestIPCidrToNetwork(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
-	network, err = IPCidrToNetwork(ip, 12)
+	network, err = DottedDecimal(IPCidrToNetwork(ip, 12)).string()
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -372,7 +372,7 @@ func TestIPCidrToNetwork(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
-	network, err = IPCidrToNetwork(ip, 18)
+	network, err = DottedDecimal(IPCidrToNetwork(ip, 18)).string()
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -382,7 +382,7 @@ func TestIPCidrToNetwork(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
-	network, err = IPCidrToNetwork(ip, 24)
+	network, err = DottedDecimal(IPCidrToNetwork(ip, 24)).string()
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -395,7 +395,7 @@ func TestIPCidrToBroadcast(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
-	broadcast, err := IPCidrToBroadcast(ip, 28)
+	broadcast, err := DottedDecimal(IPCidrToBroadcast(ip, 28)).string()
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -404,7 +404,7 @@ func TestIPCidrToBroadcast(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
-	broadcast, err = IPCidrToBroadcast(ip, 23)
+	broadcast, err = DottedDecimal(IPCidrToBroadcast(ip, 23)).string()
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -414,7 +414,7 @@ func TestIPCidrToBroadcast(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
-	broadcast, err = IPCidrToBroadcast(ip, 21)
+	broadcast, err = DottedDecimal(IPCidrToBroadcast(ip, 21)).string()
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -424,7 +424,7 @@ func TestIPCidrToBroadcast(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
-	broadcast, err = IPCidrToBroadcast(ip, 9)
+	broadcast, err = DottedDecimal(IPCidrToBroadcast(ip, 9)).string()
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -434,7 +434,7 @@ func TestIPCidrToBroadcast(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
-	broadcast, err = IPCidrToBroadcast(ip, 12)
+	broadcast, err = DottedDecimal(IPCidrToBroadcast(ip, 12)).string()
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -444,7 +444,7 @@ func TestIPCidrToBroadcast(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
-	broadcast, err = IPCidrToBroadcast(ip, 18)
+	broadcast, err = DottedDecimal(IPCidrToBroadcast(ip, 18)).string()
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -454,7 +454,7 @@ func TestIPCidrToBroadcast(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
-	broadcast, err = IPCidrToBroadcast(ip, 24)
+	broadcast, err = DottedDecimal(IPCidrToBroadcast(ip, 24)).string()
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -492,7 +492,7 @@ func checkUniqueDotted(decimals []string) bool {
 
 func TestGenOptions(t *testing.T) {
 	for range 10000 {
-		cidrs := generateCidrs()
+		cidrs := genCidersFromRandomRange()
 		if !checkUnique(cidrs) {
 			t.Fatalf("duplicate values!")
 		}

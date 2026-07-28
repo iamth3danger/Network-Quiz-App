@@ -61,7 +61,7 @@ func (c ConvChoices) getAnswerCider() int32 {
 	return c.cidrs[c.answer]
 }
 
-func getConvChoices(conv func(uint32, int) (string, error)) (ConvChoices, error) {
+func getConvChoices(conv func(uint32, int) uint32) (ConvChoices, error) {
 	ip := rand.Uint32()
 	cidrSet := rand.Int32N(OctectNum)
 	answer := rand.Int32N(QuestionIter)
@@ -87,18 +87,19 @@ func getConvChoices(conv func(uint32, int) (string, error)) (ConvChoices, error)
 			continue
 		}
 		seenCidrs[cidr] = struct{}{}
-		addr, err := conv(ip, int(cidr))
+		addr := conv(ip, int(cidr))
+		address, err := DottedDecimal(addr).string()
 		if err != nil {
 			return ConvChoices{}, err
 		}
-		_, ok = seenAddr[addr]
+		_, ok = seenAddr[address]
 		if ok {
 			continue
 		}
 
-		seenAddr[addr] = struct{}{}
+		seenAddr[address] = struct{}{}
 		cidrs = append(cidrs, cidr)
-		addresses = append(addresses, addr)
+		addresses = append(addresses, address)
 	}
 
 	return ConvChoices{
@@ -167,24 +168,14 @@ func cidrToHosts(cidr int32) string {
 	return strconv.Itoa(int(math.Pow(2, float64((32-cidr)))) - 2)
 }
 
-func IPCidrToNetwork(ip uint32, cidr int) (string, error) {
-	return calcIPCidr(ip, cidr, func(ip, mask uint32) uint32 {
-		return ip & mask
-	})
-}
-
-func IPCidrToBroadcast(ip uint32, cidr int) (string, error) {
-	return calcIPCidr(ip, cidr, func(ip, mask uint32) uint32 {
-		return ip | ^mask
-	})
-}
-
-func calcIPCidr(ip uint32, cidr int, conv IPConv) (string, error) {
+func IPCidrToNetwork(ip uint32, cidr int) uint32 {
 	mask := uint32(0xFFFFFFFF) << (32 - uint32(cidr))
+	return ip & mask
+}
 
-	result := conv(ip, mask)
-
-	return DottedDecimal(result).string()
+func IPCidrToBroadcast(ip uint32, cidr int) uint32 {
+	mask := uint32(0xFFFFFFFF) << (32 - uint32(cidr))
+	return ip | ^mask
 }
 
 func genCidersFromRandomRange() []int32 {
@@ -214,7 +205,7 @@ func generateCidrs(octNum int32) []int32 {
 	return cidrs
 }
 
-type iPCidrConverter func(uint32, int) (string, error)
+type iPCidrConverter func(uint32, int) uint32
 
 func iPCidrConversionQuestion(conv iPCidrConverter, addrType string) (Question, error) {
 	ch, err := getConvChoices(conv)
