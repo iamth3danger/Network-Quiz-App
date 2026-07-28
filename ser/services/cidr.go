@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	"math"
 	"math/rand/v2"
 	"strconv"
 	"strings"
@@ -155,6 +156,10 @@ func addressToBits(addr string) (uint32, error) {
 	return (uint32(octects[0]) << 24) | (uint32(octects[1]) << 16) | (uint32(octects[2]) << 8) | (uint32(octects[3])), nil
 }
 
+func cidrToHosts(cidr int32) string {
+	return strconv.Itoa(int(math.Pow(2, float64((32-cidr)))) - 2)
+}
+
 func IPCidrToNetwork(ip uint32, cidr int) (string, error) {
 	return calcIPCidr(ip, cidr, func(ip, mask uint32) uint32 {
 		return ip & mask
@@ -198,32 +203,6 @@ func generateCidrs() []int32 {
 	return cidrs
 }
 
-func generateQuestion(conv valueConversion, text questionText, ch Choices) (Question, error) {
-	cidrs := ch.results
-	answer := ch.answer
-
-	var results []string
-
-	for i := range QuestionNum {
-		res, err := conv(cidrs[i])
-
-		if err != nil {
-			return Question{}, err
-		}
-
-		results = append(results, res)
-	}
-
-	return Question{
-		Question: text(cidrs[answer]),
-		A:        results[0],
-		B:        results[1],
-		C:        results[2],
-		D:        results[3],
-		Answer:   getAnswer(answer),
-	}, nil
-}
-
 type iPCidrConverter func(uint32, int) (string, error)
 
 func iPCidrConversionQuestion(conv iPCidrConverter, addrType string) (Question, error) {
@@ -252,8 +231,45 @@ func IPCidrToBroadcastQuestion() (Question, error) {
 	return iPCidrConversionQuestion(IPCidrToBroadcast, "broadcast")
 }
 
-func CidrToSubnetQuestion() (Question, error) {
+func generateQuestion(conv valueConversion, text questionText, ch Choices) (Question, error) {
+	cidrs := ch.results
+	answer := ch.answer
 
+	var results []string
+
+	for i := range QuestionNum {
+		res, err := conv(cidrs[i])
+
+		if err != nil {
+			return Question{}, err
+		}
+
+		results = append(results, res)
+	}
+
+	return Question{
+		Question: text(cidrs[answer]),
+		A:        results[0],
+		B:        results[1],
+		C:        results[2],
+		D:        results[3],
+		Answer:   getAnswer(answer),
+	}, nil
+}
+
+func CidrToHostQuestion() (Question, error) {
+	return generateQuestion(
+		func(cidr int32) (string, error) {
+			return cidrToHosts(cidr), nil
+		},
+		func(cidr int32) string {
+			return fmt.Sprintf("How many usable hosts does /%d have?", cidr)
+		},
+		genChoices(),
+	)
+}
+
+func CidrToSubnetQuestion() (Question, error) {
 	return generateQuestion(
 		func(cidr int32) (string, error) {
 			return CidrToSubnet(cidr), nil
