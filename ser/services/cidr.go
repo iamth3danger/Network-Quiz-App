@@ -38,7 +38,14 @@ type Choices struct {
 
 func genChoices() Choices {
 	return Choices{
-		results: generateCidrs(),
+		results: genCidersFromRandomRange(),
+		answer:  rand.Int32N(QuestionIter),
+	}
+}
+
+func genHostChoices() Choices {
+	return Choices{
+		results: generateCidrs(3),
 		answer:  rand.Int32N(QuestionIter),
 	}
 }
@@ -180,14 +187,18 @@ func calcIPCidr(ip uint32, cidr int, conv IPConv) (string, error) {
 	return DottedDecimal(result).string()
 }
 
-func generateCidrs() []int32 {
-	cidrSet := rand.Int32N(OctectNum)
+func genCidersFromRandomRange() []int32 {
+	octNum := rand.Int32N(OctectNum)
+	return generateCidrs(octNum)
+}
+
+func generateCidrs(octNum int32) []int32 {
 
 	var cidrs []int32
 	seen := make(map[int32]struct{})
 
 	for len(cidrs) < 4 {
-		cidr := (Oct * cidrSet) + rand.Int32N(Oct)
+		cidr := (Oct * octNum) + rand.Int32N(Oct)
 
 		if cidr == 0 {
 			cidr++
@@ -265,7 +276,7 @@ func CidrToHostQuestion() (Question, error) {
 		func(cidr int32) string {
 			return fmt.Sprintf("How many usable hosts does /%d have?", cidr)
 		},
-		genChoices(),
+		genHostChoices(),
 	)
 }
 
@@ -282,7 +293,7 @@ func CidrToSubnetQuestion() (Question, error) {
 }
 
 func SubnetToCidrQuestion() Question {
-	cidrs := generateCidrs()
+	cidrs := genCidersFromRandomRange()
 	answer := rand.Int32N(QuestionIter)
 
 	answerSubnet := CidrToSubnet(cidrs[answer])
