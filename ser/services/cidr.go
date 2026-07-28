@@ -30,6 +30,81 @@ func (d DottedDecimal) string() (string, error) {
 
 type IPConv func(uint32, uint32) uint32
 
+type Choices struct {
+	results []int32
+	answer  int32
+}
+
+func genChoices() Choices {
+	return Choices{
+		results: generateCidrs(),
+		answer:  rand.Int32N(QuestionIter),
+	}
+}
+
+type ConvChoices struct {
+	cidrs     []int32
+	ip        uint32
+	answer    int32
+	addresses []string
+}
+
+func (c ConvChoices) getAnswerCider() int32 {
+	return c.cidrs[c.answer]
+}
+
+func getConvChoices(conv func(uint32, int) (string, error)) (ConvChoices, error) {
+	ip := rand.Uint32()
+	cidrSet := rand.Int32N(OctectNum)
+	answer := rand.Int32N(QuestionIter)
+
+	var cidrs []int32
+	var addresses []string
+	seenCidrs := make(map[int32]struct{})
+	seenAddr := make(map[string]struct{})
+
+	for len(cidrs) < 4 {
+
+		if len(seenCidrs) > 0 && len(seenCidrs)%8 == 0 {
+			cidrSet--
+			if cidrSet < 0 {
+				cidrSet = 3
+			}
+		}
+
+		cidr := (Oct * cidrSet) + rand.Int32N(Oct)
+
+		_, ok := seenCidrs[cidr]
+		if ok {
+			continue
+		}
+		seenCidrs[cidr] = struct{}{}
+		addr, err := conv(ip, int(cidr))
+		if err != nil {
+			return ConvChoices{}, err
+		}
+		_, ok = seenAddr[addr]
+		if ok {
+			continue
+		}
+
+		seenAddr[addr] = struct{}{}
+		cidrs = append(cidrs, cidr)
+		addresses = append(addresses, addr)
+	}
+
+	return ConvChoices{
+		cidrs:     cidrs,
+		ip:        ip,
+		answer:    answer,
+		addresses: addresses,
+	}, nil
+}
+
+type valueConversion func(cidr int32) (string, error)
+type generator func() Choices
+type questionText func(cidr int32) string
+
 func getAnswer(answer int32) string {
 	switch answer {
 	case 0:
@@ -80,25 +155,20 @@ func addressToBits(addr string) (uint32, error) {
 	return (uint32(octects[0]) << 24) | (uint32(octects[1]) << 16) | (uint32(octects[2]) << 8) | (uint32(octects[3])), nil
 }
 
-func IPCidrToNetwork(addr string, cidr int) (string, error) {
-	return calcIPCidr(addr, cidr, func(ip, mask uint32) uint32 {
+func IPCidrToNetwork(ip uint32, cidr int) (string, error) {
+	return calcIPCidr(ip, cidr, func(ip, mask uint32) uint32 {
 		return ip & mask
 	})
 }
 
-func IPCidrToBroadcast(addr string, cidr int) (string, error) {
-	return calcIPCidr(addr, cidr, func(ip, mask uint32) uint32 {
+func IPCidrToBroadcast(ip uint32, cidr int) (string, error) {
+	return calcIPCidr(ip, cidr, func(ip, mask uint32) uint32 {
 		return ip | ^mask
 	})
 }
 
-func calcIPCidr(addr string, cidr int, conv IPConv) (string, error) {
+func calcIPCidr(ip uint32, cidr int, conv IPConv) (string, error) {
 	mask := uint32(0xFFFFFFFF) << (32 - uint32(cidr))
-	ip, err := addressToBits(addr)
-
-	if err != nil {
-		return "", err
-	}
 
 	result := conv(ip, mask)
 
@@ -157,40 +227,32 @@ func generateQuestion(gen valueGen, text questionText) (Question, error) {
 	}, nil
 }
 
-func ToNetworkQuestion() (Question, error) {
-	ip := DottedDecimal(rand.Uint32())
-	ipStr, err := ip.string()
+type iPCidrConverter func(uint32, int) (string, error)
 
+func iPCidrConversionQuestion(conv iPCidrConverter, addrType string) (Question, error) {
+	ch, err := getConvChoices(conv)
 	if err != nil {
 		return Question{}, err
 	}
 
-	return generateQuestion(
-		func(cidr int32) (string, error) {
-			return IPCidrToNetwork(ipStr, int(cidr))
-		},
-		func(cidr int32) string {
-			return fmt.Sprintf("what is %s/%d as a network address?", ipStr, cidr)
-		},
-	)
+	ipStr, err := DottedDecimal(ch.ip).string()
+
+	return Question{
+		Question: fmt.Sprintf("what is %s/%d as a %s address?", ipStr, ch.getAnswerCider(), addrType),
+		A:        ch.addresses[0],
+		B:        ch.addresses[1],
+		C:        ch.addresses[2],
+		D:        ch.addresses[3],
+		Answer:   getAnswer(ch.answer),
+	}, nil
 }
 
-func ToBroadcastQuestion() (Question, error) {
-	ip := DottedDecimal(rand.Uint32())
-	ipStr, err := ip.string()
+func IPCidrToNetworkQuestion() (Question, error) {
+	return iPCidrConversionQuestion(IPCidrToNetwork, "network")
+}
 
-	if err != nil {
-		return Question{}, err
-	}
-
-	return generateQuestion(
-		func(cidr int32) (string, error) {
-			return IPCidrToBroadcast(ipStr, int(cidr))
-		},
-		func(cidr int32) string {
-			return fmt.Sprintf("what is %s/%d as a broadcast address?", ipStr, cidr)
-		},
-	)
+func IPCidrToBroadcastQuestion() (Question, error) {
+	return iPCidrConversionQuestion(IPCidrToBroadcast, "broadcast")
 }
 
 func CidrToSubnetQuestion() (Question, error) {

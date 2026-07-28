@@ -162,6 +162,32 @@ func getAnswerStr(question Question) (string, error) {
 	}
 }
 
+func extractIP(addr string) (string, error) {
+	re := regexp.MustCompile(`(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})`)
+
+	matches := re.FindAllString(addr, -1)
+	fmt.Println(matches)
+
+	if len(matches) < 1 {
+		return "", fmt.Errorf("no address found in %s", addr)
+	}
+
+	return matches[0], nil
+}
+
+func TestExtractIP(t *testing.T) {
+
+	str := "what is 192.55.255.0/25 as a network address?"
+
+	ip, err := extractIP(str)
+
+	if err != nil {
+		t.Logf("%v\n", err)
+	}
+
+	assertSubnet("192.55.255.0", ip, t)
+}
+
 func extractCIDRPrefix(cidr string) (int, error) {
 	re := regexp.MustCompile(`/(\d+)`)
 	matches := re.FindStringSubmatch(cidr)
@@ -203,8 +229,42 @@ func TestCidrToSubnet(t *testing.T) {
 	assertSubnet("255.255.255.240", CidrToSubnet(28), t)
 }
 
+func TestIPConversionQuestion(t *testing.T) {
+	question, err := iPCidrConversionQuestion(IPCidrToNetwork, "network")
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	answerStr, err := getAnswerStr(question)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	ipStr, err := extractIP(question.Question)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	cidr, err := extractCIDRPrefix(question.Question)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	ip, err := addressToBits(ipStr)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	net, err := IPCidrToNetwork(ip, cidr)
+
+	assertSubnet(net, answerStr, t)
+}
+
 func TestCidrToSubnetQuestion(t *testing.T) {
-	question := CidrToSubnetQuestion()
+	question, err := CidrToSubnetQuestion()
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
 	answerStr, err := getAnswerStr(question)
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -248,49 +308,81 @@ func TestSubnetToCidrQuestion(t *testing.T) {
 }
 
 func TestIPCidrToNetwork(t *testing.T) {
-	network, err := IPCidrToNetwork("192.68.44.37", 28)
+	ip, err := addressToBits("192.68.44.37")
+	if err != nil {
+		t.Fatalf("%v\n", err)
+	}
+	network, err := IPCidrToNetwork(ip, 28)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
 	assertSubnet("192.68.44.32", network, t)
 
-	network, err = IPCidrToNetwork("72.102.249.1", 23)
+	ip, err = addressToBits("72.102.249.1")
+	if err != nil {
+		t.Fatalf("%v\n", err)
+	}
+	network, err = IPCidrToNetwork(ip, 23)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
 	assertSubnet("72.102.248.0", network, t)
 
-	network, err = IPCidrToNetwork("151.72.48.210", 21)
+	ip, err = addressToBits("151.72.48.210")
+	if err != nil {
+		t.Fatalf("%v\n", err)
+	}
+	network, err = IPCidrToNetwork(ip, 21)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
 	assertSubnet("151.72.48.0", network, t)
 
-	network, err = IPCidrToNetwork("151.72.48.210", 5)
+	ip, err = addressToBits("151.72.48.210")
+	if err != nil {
+		t.Fatalf("%v\n", err)
+	}
+	network, err = IPCidrToNetwork(ip, 5)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
 	assertSubnet("144.0.0.0", network, t)
 
-	network, err = IPCidrToNetwork("151.72.48.210", 9)
+	ip, err = addressToBits("151.72.48.210")
+	if err != nil {
+		t.Fatalf("%v\n", err)
+	}
+	network, err = IPCidrToNetwork(ip, 9)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
 	assertSubnet("151.0.0.0", network, t)
 
-	network, err = IPCidrToNetwork("151.72.48.210", 12)
+	ip, err = addressToBits("151.72.48.210")
+	if err != nil {
+		t.Fatalf("%v\n", err)
+	}
+	network, err = IPCidrToNetwork(ip, 12)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
 	assertSubnet("151.64.0.0", network, t)
 
-	network, err = IPCidrToNetwork("151.72.48.210", 18)
+	ip, err = addressToBits("151.72.48.210")
+	if err != nil {
+		t.Fatalf("%v\n", err)
+	}
+	network, err = IPCidrToNetwork(ip, 18)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
 	assertSubnet("151.72.0.0", network, t)
 
-	network, err = IPCidrToNetwork("151.72.48.210", 24)
+	ip, err = addressToBits("151.72.48.210")
+	if err != nil {
+		t.Fatalf("%v\n", err)
+	}
+	network, err = IPCidrToNetwork(ip, 24)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -299,42 +391,70 @@ func TestIPCidrToNetwork(t *testing.T) {
 }
 
 func TestIPCidrToBroadcast(t *testing.T) {
-	broadcast, err := IPCidrToBroadcast("192.68.44.37", 28)
+	ip, err := addressToBits("192.68.44.37")
+	if err != nil {
+		t.Fatalf("%v\n", err)
+	}
+	broadcast, err := IPCidrToBroadcast(ip, 28)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
 	assertSubnet("192.68.44.47", broadcast, t)
-	broadcast, err = IPCidrToBroadcast("72.102.249.1", 23)
+	ip, err = addressToBits("72.102.249.1")
+	if err != nil {
+		t.Fatalf("%v\n", err)
+	}
+	broadcast, err = IPCidrToBroadcast(ip, 23)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
 	assertSubnet("72.102.249.255", broadcast, t)
 
-	broadcast, err = IPCidrToBroadcast("151.72.48.210", 21)
+	ip, err = addressToBits("151.72.48.210")
+	if err != nil {
+		t.Fatalf("%v\n", err)
+	}
+	broadcast, err = IPCidrToBroadcast(ip, 21)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
 	assertSubnet("151.72.55.255", broadcast, t)
 
-	broadcast, err = IPCidrToBroadcast("151.72.55.210", 9)
+	ip, err = addressToBits("151.72.55.210")
+	if err != nil {
+		t.Fatalf("%v\n", err)
+	}
+	broadcast, err = IPCidrToBroadcast(ip, 9)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
 	assertSubnet("151.127.255.255", broadcast, t)
 
-	broadcast, err = IPCidrToBroadcast("151.72.48.210", 12)
+	ip, err = addressToBits("151.72.48.210")
+	if err != nil {
+		t.Fatalf("%v\n", err)
+	}
+	broadcast, err = IPCidrToBroadcast(ip, 12)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
 	assertSubnet("151.79.255.255", broadcast, t)
 
-	broadcast, err = IPCidrToBroadcast("151.72.48.210", 18)
+	ip, err = addressToBits("151.72.48.210")
+	if err != nil {
+		t.Fatalf("%v\n", err)
+	}
+	broadcast, err = IPCidrToBroadcast(ip, 18)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
 	assertSubnet("151.72.63.255", broadcast, t)
 
-	broadcast, err = IPCidrToBroadcast("151.72.48.210", 24)
+	ip, err = addressToBits("151.72.48.210")
+	if err != nil {
+		t.Fatalf("%v\n", err)
+	}
+	broadcast, err = IPCidrToBroadcast(ip, 24)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -356,6 +476,19 @@ func checkUnique(cidrs []int32) bool {
 	return true
 }
 
+func checkUniqueDotted(decimals []string) bool {
+	decimealSet := make(map[string]struct{})
+
+	for _, d := range decimals {
+		_, ok := decimealSet[d]
+		if ok {
+			return false
+		}
+		decimealSet[d] = struct{}{}
+	}
+
+	return true
+}
 
 func TestGenOptions(t *testing.T) {
 	for range 10000 {
@@ -366,3 +499,15 @@ func TestGenOptions(t *testing.T) {
 	}
 }
 
+func TestGetConvChoices(t *testing.T) {
+	for range 10000 {
+		ch, err := getConvChoices(IPCidrToNetwork)
+		if err != nil {
+			t.Fatalf("%v\n", err)
+		}
+		if !checkUniqueDotted(ch.addresses) {
+			t.Fatalf("duplicate values!")
+		}
+
+	}
+}
