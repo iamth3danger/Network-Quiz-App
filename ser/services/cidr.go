@@ -109,9 +109,20 @@ func generateCidrs() []int32 {
 	cidrSet := rand.Int32N(OctectNum)
 
 	var cidrs []int32
+	seen := make(map[int32]struct{})
 
-	for range QuestionNum {
-		cidrs = append(cidrs, cidrSet+rand.Int32N(Oct))
+	for len(cidrs) < 4 {
+		cidr := (Oct * cidrSet) + rand.Int32N(Oct)
+
+		if cidr == 0 {
+			cidr++
+		}
+		_, ok := seen[cidr]
+		if ok {
+			continue
+		}
+		seen[cidr] = struct{}{}
+		cidrs = append(cidrs, cidr)
 	}
 
 	return cidrs

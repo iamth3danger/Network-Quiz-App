@@ -341,3 +341,28 @@ func TestIPCidrToBroadcast(t *testing.T) {
 	assertSubnet("151.72.48.255", broadcast, t)
 
 }
+
+func checkUnique(cidrs []int32) bool {
+	cidrSet := make(map[int32]struct{})
+
+	for _, cidr := range cidrs {
+		_, ok := cidrSet[cidr]
+		if ok {
+			return false
+		}
+		cidrSet[cidr] = struct{}{}
+	}
+
+	return true
+}
+
+
+func TestGenOptions(t *testing.T) {
+	for range 10000 {
+		cidrs := generateCidrs()
+		if !checkUnique(cidrs) {
+			t.Fatalf("duplicate values!")
+		}
+	}
+}
+
