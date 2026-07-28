@@ -168,23 +168,28 @@ func cidrToHosts(cidr int32) string {
 }
 
 func IPCidrToNetwork(ip uint32, cidr int) (string, error) {
+	return DottedDecimal(networkAddr(ip, cidr)).string()
+}
+
+func IPCidrToBroadcast(ip uint32, cidr int) (string, error) {
+	return DottedDecimal(broadcastAddr(ip, cidr)).string()
+}
+
+func networkAddr(ip uint32, cidr int) uint32 {
 	return calcIPCidr(ip, cidr, func(ip, mask uint32) uint32 {
 		return ip & mask
 	})
 }
 
-func IPCidrToBroadcast(ip uint32, cidr int) (string, error) {
+func broadcastAddr(ip uint32, cidr int) uint32 {
 	return calcIPCidr(ip, cidr, func(ip, mask uint32) uint32 {
 		return ip | ^mask
 	})
 }
 
-func calcIPCidr(ip uint32, cidr int, conv IPConv) (string, error) {
+func calcIPCidr(ip uint32, cidr int, conv IPConv) uint32 {
 	mask := uint32(0xFFFFFFFF) << (32 - uint32(cidr))
-
-	result := conv(ip, mask)
-
-	return DottedDecimal(result).string()
+	return conv(ip, mask)
 }
 
 func genCidersFromRandomRange() []int32 {

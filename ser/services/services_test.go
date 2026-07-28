@@ -492,7 +492,7 @@ func checkUniqueDotted(decimals []string) bool {
 
 func TestGenOptions(t *testing.T) {
 	for range 10000 {
-		cidrs := generateCidrs()
+		cidrs := generateCidrs(3)
 		if !checkUnique(cidrs) {
 			t.Fatalf("duplicate values!")
 		}
