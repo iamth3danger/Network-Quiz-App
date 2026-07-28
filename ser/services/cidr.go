@@ -175,6 +175,26 @@ func IPCidrToBroadcast(ip uint32, cidr int) (string, error) {
 	return DottedDecimal(broadcastAddr(ip, cidr)).string()
 }
 
+func IPCidrToFirstLastHost(ip uint32, cidr int) (string, error) {
+	network := networkAddr(ip, cidr)
+	broadcast := broadcastAddr(ip, cidr)
+	first := network + 1
+	last := broadcast - 1
+
+	firstAddr, err := DottedDecimal(first).string()
+
+	if err != nil {
+		return "", err
+	}
+
+	lastAddr, err := DottedDecimal(last).string()
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%s, %s", firstAddr, lastAddr), nil
+}
+
 func networkAddr(ip uint32, cidr int) uint32 {
 	return calcIPCidr(ip, cidr, func(ip, mask uint32) uint32 {
 		return ip & mask
@@ -221,7 +241,7 @@ func generateCidrs(octNum int32) []int32 {
 
 type iPCidrConverter func(uint32, int) (string, error)
 
-func iPCidrConversionQuestion(conv iPCidrConverter, addrType string) (Question, error) {
+func iPCidrConversionQuestion(conv iPCidrConverter, text func(string, int32) string) (Question, error) {
 	ch, err := getConvChoices(conv)
 	if err != nil {
 		return Question{}, err
@@ -230,7 +250,8 @@ func iPCidrConversionQuestion(conv iPCidrConverter, addrType string) (Question, 
 	ipStr, err := DottedDecimal(ch.ip).string()
 
 	return Question{
-		Question: fmt.Sprintf("what is %s/%d as a %s address?", ipStr, ch.getAnswerCider(), addrType),
+		// Question: fmt.Sprintf("what is %s/%d as a %s address?", ipStr, ch.getAnswerCider(), addrType),
+		Question: text(ipStr, ch.getAnswerCider()),
 		A:        ch.addresses[0],
 		B:        ch.addresses[1],
 		C:        ch.addresses[2],
@@ -240,11 +261,21 @@ func iPCidrConversionQuestion(conv iPCidrConverter, addrType string) (Question, 
 }
 
 func IPCidrToNetworkQuestion() (Question, error) {
-	return iPCidrConversionQuestion(IPCidrToNetwork, "network")
+	return iPCidrConversionQuestion(IPCidrToNetwork, func(s string, i int32) string {
+		return fmt.Sprintf("what is %s/%d as a network address?", s, i)
+	})
 }
 
 func IPCidrToBroadcastQuestion() (Question, error) {
-	return iPCidrConversionQuestion(IPCidrToBroadcast, "broadcast")
+	return iPCidrConversionQuestion(IPCidrToBroadcast, func(s string, i int32) string {
+		return fmt.Sprintf("what is %s/%d as a broadcast address?", s, i)
+	})
+}
+
+func IPCidrToFirstLastHostQuestion() (Question, error) {
+	return iPCidrConversionQuestion(IPCidrToFirstLastHost, func(s string, i int32) string {
+		return fmt.Sprintf("What is the first and last host of %s/%d", s, i)
+	})
 }
 
 func generateQuestion(conv valueConversion, text questionText, ch Choices) (Question, error) {

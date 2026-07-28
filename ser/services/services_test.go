@@ -230,7 +230,9 @@ func TestCidrToSubnet(t *testing.T) {
 }
 
 func TestIPConversionQuestion(t *testing.T) {
-	question, err := iPCidrConversionQuestion(IPCidrToNetwork, "network")
+	question, err := iPCidrConversionQuestion(IPCidrToNetwork, func(s string, i int32) string {
+		return fmt.Sprintf("%s/%d", s, i)
+	})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
