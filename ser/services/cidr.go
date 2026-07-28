@@ -198,17 +198,14 @@ func generateCidrs() []int32 {
 	return cidrs
 }
 
-type valueGen func(cidr int32) (string, error)
-type questionText func(cidr int32) string
-
-func generateQuestion(gen valueGen, text questionText) (Question, error) {
-	cidrs := generateCidrs()
-	answer := rand.Int32N(QuestionIter)
+func generateQuestion(conv valueConversion, text questionText, ch Choices) (Question, error) {
+	cidrs := ch.results
+	answer := ch.answer
 
 	var results []string
 
 	for i := range QuestionNum {
-		res, err := gen(cidrs[i])
+		res, err := conv(cidrs[i])
 
 		if err != nil {
 			return Question{}, err
@@ -264,18 +261,13 @@ func CidrToSubnetQuestion() (Question, error) {
 		func(cidr int32) string {
 			return fmt.Sprintf("What is /%d in dotted decimal?", cidr)
 		},
+		genChoices(),
 	)
 }
 
 func SubnetToCidrQuestion() Question {
-	cidrSet := rand.Int32N(OctectNum)
+	cidrs := generateCidrs()
 	answer := rand.Int32N(QuestionIter)
-
-	var cidrs []int32
-
-	for range QuestionNum {
-		cidrs = append(cidrs, cidrSet+rand.Int32N(Oct))
-	}
 
 	answerSubnet := CidrToSubnet(cidrs[answer])
 	question := fmt.Sprintf("Convert %s to CIDR", answerSubnet)
