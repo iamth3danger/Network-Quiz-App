@@ -107,7 +107,7 @@ func (q *Queries) CreatePorts(ctx context.Context, arg CreatePortsParams) error 
 const createQuestion = `-- name: CreateQuestion :one
 INSERT INTO questions (objective_id, question, a, b, c, d, answer, term_id)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8) 
-       RETURNING id, objective_id, question, a, b, c, d, answer, term_id
+       RETURNING id, subject_id, objective_id, question, a, b, c, d, answer, term_id
 `
 
 type CreateQuestionParams struct {
@@ -135,6 +135,7 @@ func (q *Queries) CreateQuestion(ctx context.Context, arg CreateQuestionParams) 
 	var i Question
 	err := row.Scan(
 		&i.ID,
+		&i.SubjectID,
 		&i.ObjectiveID,
 		&i.Question,
 		&i.A,
@@ -448,7 +449,7 @@ func (q *Queries) GetAllPorts(ctx context.Context) ([]Port, error) {
 }
 
 const getAllQuestions = `-- name: GetAllQuestions :many
-SELECT q.id, q.objective_id, q.question, q.a, q.b, q.c, q.d, q.answer, q.term_id FROM questions q JOIN terms t ON t.id = q.term_id WHERE t.on_exam = true
+SELECT q.id, q.subject_id, q.objective_id, q.question, q.a, q.b, q.c, q.d, q.answer, q.term_id FROM questions q JOIN terms t ON t.id = q.term_id WHERE t.on_exam = true
 `
 
 func (q *Queries) GetAllQuestions(ctx context.Context) ([]Question, error) {
@@ -462,6 +463,7 @@ func (q *Queries) GetAllQuestions(ctx context.Context) ([]Question, error) {
 		var i Question
 		if err := rows.Scan(
 			&i.ID,
+			&i.SubjectID,
 			&i.ObjectiveID,
 			&i.Question,
 			&i.A,
@@ -570,7 +572,7 @@ func (q *Queries) GetAllTerms(ctx context.Context) ([]Term, error) {
 }
 
 const getAllWrongQuestions = `-- name: GetAllWrongQuestions :many
-SELECT q.id, q.objective_id, q.question, q.a, q.b, q.c, q.d, q.answer, q.term_id FROM questions q 
+SELECT q.id, q.subject_id, q.objective_id, q.question, q.a, q.b, q.c, q.d, q.answer, q.term_id FROM questions q 
 JOIN scores s on s.question_id = q.id 
 WHERE s.wrong_count > 0
 AND s.streak = 0
@@ -587,6 +589,7 @@ func (q *Queries) GetAllWrongQuestions(ctx context.Context) ([]Question, error) 
 		var i Question
 		if err := rows.Scan(
 			&i.ID,
+			&i.SubjectID,
 			&i.ObjectiveID,
 			&i.Question,
 			&i.A,
@@ -595,6 +598,37 @@ func (q *Queries) GetAllWrongQuestions(ctx context.Context) ([]Question, error) 
 			&i.D,
 			&i.Answer,
 			&i.TermID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAutoGenScores = `-- name: GetAutoGenScores :many
+SELECT id, subject_id, question, right_count, wrong_count, streak FROM autogen_scores
+`
+
+func (q *Queries) GetAutoGenScores(ctx context.Context) ([]AutogenScore, error) {
+	rows, err := q.db.Query(ctx, getAutoGenScores)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AutogenScore
+	for rows.Next() {
+		var i AutogenScore
+		if err := rows.Scan(
+			&i.ID,
+			&i.SubjectID,
+			&i.Question,
+			&i.RightCount,
+			&i.WrongCount,
+			&i.Streak,
 		); err != nil {
 			return nil, err
 		}
@@ -1025,13 +1059,14 @@ func (q *Queries) GetRandomQuestion(ctx context.Context, objectiveID pgtype.Int4
 }
 
 const getReviewedQuestions = `-- name: GetReviewedQuestions :many
-SELECT q.id, q.objective_id, q.question, q.a, q.b, q.c, q.d, q.answer, q.term_id, s.id, s.question_id, s.right_count, s.wrong_count, s.streak FROM questions q
+SELECT q.id, q.subject_id, q.objective_id, q.question, q.a, q.b, q.c, q.d, q.answer, q.term_id, s.id, s.question_id, s.right_count, s.wrong_count, s.streak FROM questions q
                   JOIN scores s ON s.question_id = q.id
                   AND q.objective_id = $1
 `
 
 type GetReviewedQuestionsRow struct {
 	ID          int32       `json:"id"`
+	SubjectID   pgtype.Int4 `json:"subject_id"`
 	ObjectiveID pgtype.Int4 `json:"objective_id"`
 	Question    string      `json:"question"`
 	A           string      `json:"a"`
@@ -1058,6 +1093,7 @@ func (q *Queries) GetReviewedQuestions(ctx context.Context, objectiveID pgtype.I
 		var i GetReviewedQuestionsRow
 		if err := rows.Scan(
 			&i.ID,
+			&i.SubjectID,
 			&i.ObjectiveID,
 			&i.Question,
 			&i.A,
@@ -1215,7 +1251,7 @@ func (q *Queries) GetTermsByObjectiveId(ctx context.Context, objectiveID pgtype.
 }
 
 const getWrongQuestionsByExam = `-- name: GetWrongQuestionsByExam :many
-SELECT q.id, q.objective_id, q.question, q.a, q.b, q.c, q.d, q.answer, q.term_id FROM questions q 
+SELECT q.id, q.subject_id, q.objective_id, q.question, q.a, q.b, q.c, q.d, q.answer, q.term_id FROM questions q 
 JOIN scores s on s.question_id = q.id 
 WHERE s.wrong_count > 0
 AND s.streak = 0
@@ -1233,6 +1269,7 @@ func (q *Queries) GetWrongQuestionsByExam(ctx context.Context, objectiveID pgtyp
 		var i Question
 		if err := rows.Scan(
 			&i.ID,
+			&i.SubjectID,
 			&i.ObjectiveID,
 			&i.Question,
 			&i.A,

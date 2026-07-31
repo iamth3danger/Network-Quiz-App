@@ -89,6 +89,19 @@ func scoreFromDB(scoreDb quiz.Score) Score {
 	}
 }
 
+func autoScoreFromDB(autoDb quiz.AutogenScore, genMap map[Generator]Scorer) {
+	gen := Generator(autoDb.Question)
+	score := Score{
+		RightCount: autoDb.RightCount.Int32,
+		WrongCount: autoDb.WrongCount.Int32,
+		Streak:     autoDb.Streak.Int32,
+	}
+
+	var scorer Scorer = &score
+
+	genMap[gen] = Scorer(scorer)
+}
+
 type ObjectiveScore struct {
 	ID          int32 `json:"id"`
 	ObjectiveID int32 `json:"objective_id"`

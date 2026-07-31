@@ -255,4 +255,6 @@ FROM questions q JOIN exam_objectives e ON e.id = q.objective_id
 LEFT JOIN scores s ON s.question_id = q.id
 GROUP BY e.code;
 
+-- name: GetAutoGenScores :many 
+SELECT * FROM autogen_scores;
 

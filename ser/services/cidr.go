@@ -273,8 +273,8 @@ func IPCidrToBroadcastQuestion() (Question, error) {
 }
 
 func IPCidrToFirstLastHostQuestion() (Question, error) {
-	return iPCidrConversionQuestion(IPCidrToFirstLastHost, func(s string, i int32) string {
-		return fmt.Sprintf("What is the first and last host of %s/%d", s, i)
+	return iPCidrConversionQuestion(IPCidrToBroadcast, func(s string, i int32) string {
+		return fmt.Sprintf("what is %s/%d as a broadcast address?", s, i)
 	})
 }
 

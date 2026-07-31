@@ -138,6 +138,7 @@ func (s *StoreService) UpdateStoreOnMatching(ctx context.Context, store *Store) 
 	store.matchingQuiz = matching
 	return store, nil
 }
+
 func (s *StoreService) fetchExamObjectives(ctx context.Context) (map[int32]float64, map[float64]int32, error) {
 	var examObjectives []ExamObjective
 	examIdCode := make(map[int32]float64)
@@ -243,6 +244,35 @@ func (s *StoreService) fetchPortScores(ctx context.Context) (map[int32]Scorer, e
 	}
 
 	return portScores, nil
+}
+
+func (s *StoreService) fetchAutogenScores(ctx context.Context) (map[Generator]Scorer, error) {
+	autogenScores := make(map[Generator]Scorer)
+	autogenDb, err := s.queries.GetAutoGenScores(ctx)
+
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrDBFetch, err)
+	}
+
+	for _, score := range autogenDb {
+		autoScoreFromDB(score, autogenScores)
+	}
+
+	for _, gen := range Generators {
+		_, ok := autogenScores[gen]
+
+		if !ok {
+			score := Score{
+				RightCount: 0,
+				WrongCount: 0,
+				Streak:     0,
+			}
+			var scorer Scorer = &score
+			autogenScores[gen] = scorer
+		}
+	}
+
+	return autogenScores, nil
 }
 
 func (s *StoreService) fetchObjectiveScores(ctx context.Context) (map[int32]ObjectiveScore, error) {
