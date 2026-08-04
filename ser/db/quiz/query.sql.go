@@ -71,6 +71,19 @@ func (q *Queries) CreateObjectiveScore(ctx context.Context, objectiveID pgtype.I
 	return i, err
 }
 
+const createOrGetSubject = `-- name: CreateOrGetSubject :one
+INSERT INTO subjects (title) VALUES ($1)
+ON CONFLICT (title) DO UPDATE SET title = EXCLUDED.title
+RETURNING id
+`
+
+func (q *Queries) CreateOrGetSubject(ctx context.Context, title string) (int32, error) {
+	row := q.db.QueryRow(ctx, createOrGetSubject, title)
+	var id int32
+	err := row.Scan(&id)
+	return id, err
+}
+
 const createOrUpdateTurn = `-- name: CreateOrUpdateTurn :exec
 INSERT INTO turns (question_id, turn) VALUES ($1, $2) ON CONFLICT (question_id) DO UPDATE SET turn = $2
 `
@@ -212,6 +225,48 @@ func (q *Queries) CreateState(ctx context.Context, arg CreateStateParams) (State
 	row := q.db.QueryRow(ctx, createState, arg.Turn, arg.ObjectiveID)
 	var i State
 	err := row.Scan(&i.ID, &i.Turn, &i.ObjectiveID)
+	return i, err
+}
+
+const createSubjectQuestion = `-- name: CreateSubjectQuestion :one
+INSERT INTO questions (subject_id, question, a, b, c, d, answer)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)
+       RETURNING id, subject_id, objective_id, question, a, b, c, d, answer, term_id
+`
+
+type CreateSubjectQuestionParams struct {
+	SubjectID pgtype.Int4 `json:"subject_id"`
+	Question  string      `json:"question"`
+	A         string      `json:"a"`
+	B         string      `json:"b"`
+	C         string      `json:"c"`
+	D         string      `json:"d"`
+	Answer    string      `json:"answer"`
+}
+
+func (q *Queries) CreateSubjectQuestion(ctx context.Context, arg CreateSubjectQuestionParams) (Question, error) {
+	row := q.db.QueryRow(ctx, createSubjectQuestion,
+		arg.SubjectID,
+		arg.Question,
+		arg.A,
+		arg.B,
+		arg.C,
+		arg.D,
+		arg.Answer,
+	)
+	var i Question
+	err := row.Scan(
+		&i.ID,
+		&i.SubjectID,
+		&i.ObjectiveID,
+		&i.Question,
+		&i.A,
+		&i.B,
+		&i.C,
+		&i.D,
+		&i.Answer,
+		&i.TermID,
+	)
 	return i, err
 }
 
@@ -532,6 +587,30 @@ func (q *Queries) GetAllScores(ctx context.Context) ([]Score, error) {
 			&i.WrongCount,
 			&i.Streak,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAllSubjects = `-- name: GetAllSubjects :many
+SELECT id, title FROM subjects
+`
+
+func (q *Queries) GetAllSubjects(ctx context.Context) ([]Subject, error) {
+	rows, err := q.db.Query(ctx, getAllSubjects)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Subject
+	for rows.Next() {
+		var i Subject
+		if err := rows.Scan(&i.ID, &i.Title); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -1019,6 +1098,31 @@ func (q *Queries) GetQuestionsByIds(ctx context.Context, ids []int32) ([]string,
 	return items, nil
 }
 
+const getQuestionsBySubjectId = `-- name: GetQuestionsBySubjectId :many
+SELECT question FROM questions
+                WHERE subject_id = $1
+`
+
+func (q *Queries) GetQuestionsBySubjectId(ctx context.Context, subjectID pgtype.Int4) ([]string, error) {
+	rows, err := q.db.Query(ctx, getQuestionsBySubjectId, subjectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var question string
+		if err := rows.Scan(&question); err != nil {
+			return nil, err
+		}
+		items = append(items, question)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getRandomQuestion = `-- name: GetRandomQuestion :one
 SELECT q.id, q.question, q.a, q.b, q.c, q.d, q.answer, q.objective_id, q.term_id
 FROM questions q
@@ -1133,6 +1237,17 @@ func (q *Queries) GetScoreByQuestionId(ctx context.Context, questionID pgtype.In
 		&i.Streak,
 	)
 	return i, err
+}
+
+const getSubjectIdByTitle = `-- name: GetSubjectIdByTitle :one
+SELECT id FROM subjects WHERE title = $1
+`
+
+func (q *Queries) GetSubjectIdByTitle(ctx context.Context, title string) (int32, error) {
+	row := q.db.QueryRow(ctx, getSubjectIdByTitle, title)
+	var id int32
+	err := row.Scan(&id)
+	return id, err
 }
 
 const getTermIds = `-- name: GetTermIds :many

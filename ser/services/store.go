@@ -10,10 +10,13 @@ import (
 type Store struct {
 	examIdCode      map[int32]float64
 	examCodeId      map[float64]int32
+	subjectTextId   map[string]int32
+	subjectIdText   map[int32]string
 	questions       map[int32]Question
 	questionExamId  map[int32][]Question
 	scores          map[int32]Scorer
 	objectiveScores map[int32]ObjectiveScore
+	autogenScores   map[Generator]Scorer
 	quiz            map[int32][]Quiz
 	ports           []Port
 	portScores      map[int32]Scorer

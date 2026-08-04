@@ -22,6 +22,10 @@ func (s *StoreService) NewStore(ctx context.Context) (*Store, error) {
 	if err != nil {
 		return &Store{}, err
 	}
+	subjectIdText, subjectTextId, err := s.fetchSubjects(ctx)
+	if err != nil {
+		return &Store{}, err
+	}
 	questions, questionExamId, err := s.fetchQuestions(ctx)
 	if err != nil {
 		return &Store{}, err
@@ -47,6 +51,10 @@ func (s *StoreService) NewStore(ctx context.Context) (*Store, error) {
 	if err != nil {
 		return &Store{}, err
 	}
+	autoGenScores, err := s.fetchAutogenScores(ctx)
+	if err != nil {
+		return &Store{}, err
+	}
 	scores, err := s.fetchScores(ctx)
 	if err != nil {
 		return &Store{}, err
@@ -59,6 +67,8 @@ func (s *StoreService) NewStore(ctx context.Context) (*Store, error) {
 	return &Store{
 		examIdCode:      examIdCode,
 		examCodeId:      examCodeId,
+		subjectTextId:   subjectTextId,
+		subjectIdText:   subjectIdText,
 		questions:       questions,
 		questionExamId:  questionExamId,
 		quiz:            quiz,
@@ -67,6 +77,7 @@ func (s *StoreService) NewStore(ctx context.Context) (*Store, error) {
 		ports:           ports,
 		portScores:      portScores,
 		objectiveScores: objectiveScores,
+		autogenScores:   autoGenScores,
 		scores:          scores,
 		matchingQuiz:    matchingQuiz,
 	}, nil
@@ -163,6 +174,24 @@ func (s *StoreService) fetchExamObjectives(ctx context.Context) (map[int32]float
 	}
 
 	return examIdCode, examCodeId, nil
+}
+
+func (s *StoreService) fetchSubjects(ctx context.Context) (map[int32]string, map[string]int32, error) {
+	subjectIdText := make(map[int32]string)
+	subjectTextId := make(map[string]int32)
+
+	subjectDb, err := s.queries.GetAllSubjects(ctx)
+
+	if err != nil {
+		return nil, nil, fmt.Errorf("%w: %w", ErrDBFetch, err)
+	}
+
+	for _, sub := range subjectDb {
+		subjectIdText[sub.ID] = sub.Title
+		subjectTextId[sub.Title] = sub.ID
+	}
+
+	return subjectIdText, subjectTextId, nil
 }
 
 func (s *StoreService) fetchQuestions(ctx context.Context) (map[int32]Question, map[int32][]Question, error) {

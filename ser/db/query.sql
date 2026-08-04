@@ -3,6 +3,23 @@ INSERT INTO questions (objective_id, question, a, b, c, d, answer, term_id)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8) 
        RETURNING *;
 
+-- name: CreateSubjectQuestion :one
+INSERT INTO questions (subject_id, question, a, b, c, d, answer)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)
+       RETURNING *;
+
+-- name: GetSubjectIdByTitle :one
+SELECT id FROM subjects WHERE title = $1;
+
+-- name: CreateOrGetSubject :one
+INSERT INTO subjects (title) VALUES ($1)
+ON CONFLICT (title) DO UPDATE SET title = EXCLUDED.title
+RETURNING id;
+
+-- name: GetQuestionsBySubjectId :many
+SELECT question FROM questions
+                WHERE subject_id = $1;
+
 -- name: GetReviewedQuestions :many
 SELECT q.*, s.* FROM questions q
                   JOIN scores s ON s.question_id = q.id
@@ -203,6 +220,9 @@ SELECT * FROM matching_quiz;
 
 -- name: GetAllObjectiveScore :many
 SELECT * FROM objective_scores;
+
+-- name: GetAllSubjects :many 
+SELECT * FROM subjects;
 
 -- name: CreatePorts :exec 
 INSERT INTO ports (abbreviation, port, protocol) VALUES (

@@ -12,6 +12,7 @@ import (
 type Question struct {
 	ID          int32  `json:"id"`
 	ObjectiveID int32  `json:"objective_id"`
+	SubjectID   int32  `json:"subject_id"`
 	Question    string `json:"question"`
 	A           string `json:"a"`
 	B           string `json:"b"`

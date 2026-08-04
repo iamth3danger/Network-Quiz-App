@@ -66,6 +66,18 @@ func examFromDB(examDb quiz.ExamObjective) ExamObjective {
 	}
 }
 
+type Subject struct {
+	ID    int32  `json:"id"`
+	Title string `json:"title"`
+}
+
+func subjectFromDB(subDb quiz.Subject) Subject {
+	return Subject{
+		ID:    subDb.ID,
+		Title: subDb.Title,
+	}
+}
+
 type ObjectiveStat struct {
 	Code           float64
 	Right          int32
