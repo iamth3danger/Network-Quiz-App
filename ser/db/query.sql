@@ -100,12 +100,20 @@ UPDATE objective_scores SET right_count = right_count + 1 WHERE objective_id = $
 UPDATE objective_scores SET wrong_count = wrong_count + 1 WHERE objective_id = $1 RETURNING *;
 
 -- name: CreateQuizQuestion :one
-INSERT INTO quiz (question_id, objective_id, status) VALUES ($1, $2, $3) RETURNING *;
+INSERT INTO quiz (question_id, objective_id, subject_id, status) VALUES ($1, $2, $3, $4) RETURNING *;
 
--- name: BatchQuizQuestion :exec 
+-- name: BatchQuizQuestionExam :exec 
 INSERT INTO quiz (question_id, objective_id, status) VALUES (
     unnest(@question_ids::integer[]), 
     unnest(@objective_ids::integer[]), 
+    unnest(@status::text[])::question_status
+);
+
+
+-- name: BatchQuizQuestionSubject :exec 
+INSERT INTO quiz (question_id, subject_id, status) VALUES (
+    unnest(@question_ids::integer[]), 
+    unnest(@subject_ids::integer[]), 
     unnest(@status::text[])::question_status
 );
 
@@ -121,6 +129,11 @@ UPDATE quiz SET status = 'answered' WHERE question_id = $1 RETURNING *;
 -- name: DeleteQuizWithExamId :exec
 DELETE FROM quiz
 WHERE objective_id = $1;
+
+-- name: DeleteQuizWithObjectiveId :exec 
+DELETE FROM quiz WHERE subject_id = $1;
+
+
 
 
 -- name: GetRandomQuestion :one

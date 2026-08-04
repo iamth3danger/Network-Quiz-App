@@ -259,16 +259,34 @@ func (s *QuizService) GetQuestionSetByExamId(ctx context.Context, examId int32) 
 }
 
 func (s *QuizService) SaveQuizQuestions(ctx context.Context, reviewed Question, questions []Question) error {
-	_, err := s.queries.CreateQuizQuestion(ctx, quiz.CreateQuizQuestionParams{
-		QuestionID:  pgtype.Int4{Int32: reviewed.ID, Valid: true},
-		ObjectiveID: pgtype.Int4{Int32: reviewed.ObjectiveID, Valid: true},
-		Status:      quiz.NullQuestionStatus{QuestionStatus: quiz.QuestionStatusReviewing, Valid: true},
-	})
 
-	if err != nil {
-		return fmt.Errorf("%w: %w", ErrDBFetch, err)
+	if reviewed.ObjectiveID != 0 {
+		_, err := s.queries.CreateQuizQuestion(ctx, quiz.CreateQuizQuestionParams{
+			QuestionID:  pgtype.Int4{Int32: reviewed.ID, Valid: true},
+			ObjectiveID: pgtype.Int4{Int32: reviewed.ObjectiveID, Valid: true},
+			Status:      quiz.NullQuestionStatus{QuestionStatus: quiz.QuestionStatusReviewing, Valid: true},
+		})
+
+		if err != nil {
+			return fmt.Errorf("%w: %w", ErrDBFetch, err)
+		}
+
+		quizQuestion := makeBatchQuizQuestionExam(questions)
+		return s.queries.BatchQuizQuestionExam(ctx, quizQuestion)
+
+	} else {
+		_, err := s.queries.CreateQuizQuestion(ctx, quiz.CreateQuizQuestionParams{
+			QuestionID: pgtype.Int4{Int32: reviewed.ID, Valid: true},
+			SubjectID:  pgtype.Int4{Int32: reviewed.SubjectID, Valid: true},
+			Status:     quiz.NullQuestionStatus{QuestionStatus: quiz.QuestionStatusReviewing, Valid: true},
+		})
+
+		if err != nil {
+			return fmt.Errorf("%w: %w", ErrDBFetch, err)
+		}
+
+		quizQuestion := makeBatchQuizQuestionSubject(questions)
+		return s.queries.BatchQuizQuestionSubject(ctx, quizQuestion)
 	}
 
-	quizQuestion := makeBatchQuizQuestion(questions)
-	return s.queries.BatchQuizQuestion(ctx, quizQuestion)
 }

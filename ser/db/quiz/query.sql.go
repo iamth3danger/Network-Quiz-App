@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const batchQuizQuestion = `-- name: BatchQuizQuestion :exec
+const batchQuizQuestionExam = `-- name: BatchQuizQuestionExam :exec
 INSERT INTO quiz (question_id, objective_id, status) VALUES (
     unnest($1::integer[]), 
     unnest($2::integer[]), 
@@ -19,14 +19,33 @@ INSERT INTO quiz (question_id, objective_id, status) VALUES (
 )
 `
 
-type BatchQuizQuestionParams struct {
+type BatchQuizQuestionExamParams struct {
 	QuestionIds  []int32  `json:"question_ids"`
 	ObjectiveIds []int32  `json:"objective_ids"`
 	Status       []string `json:"status"`
 }
 
-func (q *Queries) BatchQuizQuestion(ctx context.Context, arg BatchQuizQuestionParams) error {
-	_, err := q.db.Exec(ctx, batchQuizQuestion, arg.QuestionIds, arg.ObjectiveIds, arg.Status)
+func (q *Queries) BatchQuizQuestionExam(ctx context.Context, arg BatchQuizQuestionExamParams) error {
+	_, err := q.db.Exec(ctx, batchQuizQuestionExam, arg.QuestionIds, arg.ObjectiveIds, arg.Status)
+	return err
+}
+
+const batchQuizQuestionSubject = `-- name: BatchQuizQuestionSubject :exec
+INSERT INTO quiz (question_id, subject_id, status) VALUES (
+    unnest($1::integer[]), 
+    unnest($2::integer[]), 
+    unnest($3::text[])::question_status
+)
+`
+
+type BatchQuizQuestionSubjectParams struct {
+	QuestionIds []int32  `json:"question_ids"`
+	SubjectIds  []int32  `json:"subject_ids"`
+	Status      []string `json:"status"`
+}
+
+func (q *Queries) BatchQuizQuestionSubject(ctx context.Context, arg BatchQuizQuestionSubjectParams) error {
+	_, err := q.db.Exec(ctx, batchQuizQuestionSubject, arg.QuestionIds, arg.SubjectIds, arg.Status)
 	return err
 }
 
@@ -162,22 +181,29 @@ func (q *Queries) CreateQuestion(ctx context.Context, arg CreateQuestionParams) 
 }
 
 const createQuizQuestion = `-- name: CreateQuizQuestion :one
-INSERT INTO quiz (question_id, objective_id, status) VALUES ($1, $2, $3) RETURNING id, question_id, objective_id, status
+INSERT INTO quiz (question_id, objective_id, subject_id, status) VALUES ($1, $2, $3, $4) RETURNING id, question_id, objective_id, subject_id, status
 `
 
 type CreateQuizQuestionParams struct {
 	QuestionID  pgtype.Int4        `json:"question_id"`
 	ObjectiveID pgtype.Int4        `json:"objective_id"`
+	SubjectID   pgtype.Int4        `json:"subject_id"`
 	Status      NullQuestionStatus `json:"status"`
 }
 
 func (q *Queries) CreateQuizQuestion(ctx context.Context, arg CreateQuizQuestionParams) (Quiz, error) {
-	row := q.db.QueryRow(ctx, createQuizQuestion, arg.QuestionID, arg.ObjectiveID, arg.Status)
+	row := q.db.QueryRow(ctx, createQuizQuestion,
+		arg.QuestionID,
+		arg.ObjectiveID,
+		arg.SubjectID,
+		arg.Status,
+	)
 	var i Quiz
 	err := row.Scan(
 		&i.ID,
 		&i.QuestionID,
 		&i.ObjectiveID,
+		&i.SubjectID,
 		&i.Status,
 	)
 	return i, err
@@ -326,6 +352,15 @@ WHERE objective_id = $1
 
 func (q *Queries) DeleteQuizWithExamId(ctx context.Context, objectiveID pgtype.Int4) error {
 	_, err := q.db.Exec(ctx, deleteQuizWithExamId, objectiveID)
+	return err
+}
+
+const deleteQuizWithObjectiveId = `-- name: DeleteQuizWithObjectiveId :exec
+DELETE FROM quiz WHERE subject_id = $1
+`
+
+func (q *Queries) DeleteQuizWithObjectiveId(ctx context.Context, subjectID pgtype.Int4) error {
+	_, err := q.db.Exec(ctx, deleteQuizWithObjectiveId, subjectID)
 	return err
 }
 
@@ -539,7 +574,7 @@ func (q *Queries) GetAllQuestions(ctx context.Context) ([]Question, error) {
 }
 
 const getAllQuiz = `-- name: GetAllQuiz :many
-SELECT id, question_id, objective_id, status FROM quiz
+SELECT id, question_id, objective_id, subject_id, status FROM quiz
 `
 
 func (q *Queries) GetAllQuiz(ctx context.Context) ([]Quiz, error) {
@@ -555,6 +590,7 @@ func (q *Queries) GetAllQuiz(ctx context.Context) ([]Quiz, error) {
 			&i.ID,
 			&i.QuestionID,
 			&i.ObjectiveID,
+			&i.SubjectID,
 			&i.Status,
 		); err != nil {
 			return nil, err
@@ -1405,7 +1441,7 @@ func (q *Queries) GetWrongQuestionsByExam(ctx context.Context, objectiveID pgtyp
 }
 
 const setQuizStatusAnswered = `-- name: SetQuizStatusAnswered :one
-UPDATE quiz SET status = 'answered' WHERE question_id = $1 RETURNING id, question_id, objective_id, status
+UPDATE quiz SET status = 'answered' WHERE question_id = $1 RETURNING id, question_id, objective_id, subject_id, status
 `
 
 func (q *Queries) SetQuizStatusAnswered(ctx context.Context, questionID pgtype.Int4) (Quiz, error) {
@@ -1415,13 +1451,14 @@ func (q *Queries) SetQuizStatusAnswered(ctx context.Context, questionID pgtype.I
 		&i.ID,
 		&i.QuestionID,
 		&i.ObjectiveID,
+		&i.SubjectID,
 		&i.Status,
 	)
 	return i, err
 }
 
 const setQuizStatusPending = `-- name: SetQuizStatusPending :one
-UPDATE quiz SET status = 'pending' WHERE question_id = $1 RETURNING id, question_id, objective_id, status
+UPDATE quiz SET status = 'pending' WHERE question_id = $1 RETURNING id, question_id, objective_id, subject_id, status
 `
 
 func (q *Queries) SetQuizStatusPending(ctx context.Context, questionID pgtype.Int4) (Quiz, error) {
@@ -1431,13 +1468,14 @@ func (q *Queries) SetQuizStatusPending(ctx context.Context, questionID pgtype.In
 		&i.ID,
 		&i.QuestionID,
 		&i.ObjectiveID,
+		&i.SubjectID,
 		&i.Status,
 	)
 	return i, err
 }
 
 const setQuizStatusReviewing = `-- name: SetQuizStatusReviewing :one
-UPDATE quiz SET status = 'reviewing' WHERE question_id = $1 RETURNING id, question_id, objective_id, status
+UPDATE quiz SET status = 'reviewing' WHERE question_id = $1 RETURNING id, question_id, objective_id, subject_id, status
 `
 
 func (q *Queries) SetQuizStatusReviewing(ctx context.Context, questionID pgtype.Int4) (Quiz, error) {
@@ -1447,6 +1485,7 @@ func (q *Queries) SetQuizStatusReviewing(ctx context.Context, questionID pgtype.
 		&i.ID,
 		&i.QuestionID,
 		&i.ObjectiveID,
+		&i.SubjectID,
 		&i.Status,
 	)
 	return i, err

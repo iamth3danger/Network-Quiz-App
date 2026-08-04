@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS quiz (
   id SERIAL PRIMARY KEY,
   question_id INTEGER REFERENCES questions(id) UNIQUE,
   objective_id INTEGER REFERENCES exam_objectives(id),
+  subject_id INTEGER REFERENCES subjects(id),
   status question_status
 );
 

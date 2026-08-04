@@ -113,6 +113,7 @@ type Quiz struct {
 	ID          int32              `json:"id"`
 	QuestionID  pgtype.Int4        `json:"question_id"`
 	ObjectiveID pgtype.Int4        `json:"objective_id"`
+	SubjectID   pgtype.Int4        `json:"subject_id"`
 	Status      NullQuestionStatus `json:"status"`
 }
 

@@ -163,6 +163,16 @@ func parseExamObjective(r *http.Request) (float64, error) {
 	return examObj, nil
 }
 
+func parseSubject(r *http.Request) (string, error) {
+	subject := r.URL.Query().Get("subject")
+
+	if subject == "" {
+		return "", ErrEmptyParam{Param: "subject"}
+	}
+
+	return subject, nil
+}
+
 func (a *App) GetQuestionNumber(w http.ResponseWriter, r *http.Request) {
 
 	examObj, err := parseExamObjective(r)
