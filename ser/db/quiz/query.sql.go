@@ -355,12 +355,12 @@ func (q *Queries) DeleteQuizWithExamId(ctx context.Context, objectiveID pgtype.I
 	return err
 }
 
-const deleteQuizWithObjectiveId = `-- name: DeleteQuizWithObjectiveId :exec
+const deleteQuizWithSubjectId = `-- name: DeleteQuizWithSubjectId :exec
 DELETE FROM quiz WHERE subject_id = $1
 `
 
-func (q *Queries) DeleteQuizWithObjectiveId(ctx context.Context, subjectID pgtype.Int4) error {
-	_, err := q.db.Exec(ctx, deleteQuizWithObjectiveId, subjectID)
+func (q *Queries) DeleteQuizWithSubjectId(ctx context.Context, subjectID pgtype.Int4) error {
+	_, err := q.db.Exec(ctx, deleteQuizWithSubjectId, subjectID)
 	return err
 }
 

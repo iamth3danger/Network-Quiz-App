@@ -131,8 +131,12 @@ func NewQuizService(q *quiz.Queries) QuizService {
 	}
 }
 
-func (s *QuizService) DeleteQuiz(ctx context.Context, examId int32) error {
+func (s *QuizService) DeleteQuizExam(ctx context.Context, examId int32) error {
 	return s.queries.DeleteQuizWithExamId(ctx, pgtype.Int4{Int32: examId, Valid: true})
+}
+
+func (s *QuizService) DeleteQuizSubject(ctx context.Context, subjectId int32) error {
+	return s.queries.DeleteQuizWithSubjectId(ctx, pgtype.Int4{Int32: subjectId, Valid: true})
 }
 
 func (s *QuizService) SetQuizStatusReviewing(ctx context.Context, questionId int32) error {

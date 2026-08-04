@@ -20,9 +20,19 @@ import (
 type ErrEmptyParam struct{ Param string }
 type ErrInvalidArg struct{ Param, Value string }
 
+var ErrTooManyParam = errors.New("too many params!")
+
 func (e ErrEmptyParam) Error() string { return fmt.Sprintf("missing required params: %s", e.Param) }
 func (e ErrInvalidArg) Error() string {
 	return fmt.Sprintf("invalid value for %s: %q", e.Param, e.Value)
+}
+func (e ErrTooManyParam) Error() string {
+	return fmt.Sprintf("too many params!")
+}
+
+type HttpParams struct {
+	examObjective float64
+	subjectTitle  string
 }
 
 type App struct {
@@ -163,6 +173,40 @@ func parseExamObjective(r *http.Request) (float64, error) {
 	return examObj, nil
 }
 
+func parseParams(r *http.Request) (HttpParams, error) {
+
+	examObjective, err := parseExamObjective(r)
+
+	if err != nil {
+		var e ErrInvalidArg
+		if errors.As(err, &e) {
+			return HttpParams{}, err
+		}
+	}
+
+	subject, err := parseSubject(r)
+
+	if err != nil {
+		var e ErrInvalidArg
+		if errors.As(err, &e) {
+			return HttpParams{}, err
+		}
+	}
+
+	if subject != "" && examObjective != 0 {
+		return HttpParams{}, fmt.Errorf("%w", ErrTooManyParam)
+	}
+
+	if subject == "" && examObjective == 0 {
+		return HttpParams{}, ErrEmptyParam{Param: "subject or exam_obj"}
+	}
+
+	return HttpParams{
+		examObjective: examObjective,
+		subjectTitle:  subject,
+	}, nil
+}
+
 func parseSubject(r *http.Request) (string, error) {
 	subject := r.URL.Query().Get("subject")
 
@@ -216,45 +260,104 @@ func (a *App) GetQuestion(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) GenerateQuiz(w http.ResponseWriter, r *http.Request) {
-	examObj, err := parseExamObjective(r)
+	params, err := parseParams(r)
 
 	if err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Errorf("request requires exam_objective"))
 		return
 	}
 
-	now := time.Now().UnixNano()
-	questions, err := a.store.GenerateQuizFromExam(examObj)
-	log.Printf("time taken to generate quiz %d", time.Now().UnixNano()-now)
+	examObj := params.examObjective
+	subject := params.subjectTitle
 
-	if err != nil {
-		handleError(w, err)
+	if examObj != 0 {
+
+		now := time.Now().UnixNano()
+		var questions []services.Question
+
+		if examObj != 0 {
+			questions, err = a.store.GenerateQuizFromExam(examObj)
+			log.Printf("time taken to generate quiz %d", time.Now().UnixNano()-now)
+
+			if err != nil {
+				handleError(w, err)
+			}
+		} else {
+			questions, err = a.store.GenerateQuizFromSubject(subject)
+			log.Printf("time taken to generate quiz %d", time.Now().UnixNano()-now)
+
+			if err != nil {
+				handleError(w, err)
+			}
+		}
+
+		retQuestion := questions[0]
+		questions = questions[1:]
+		go func() {
+			ctx := context.Background()
+			examId, err := a.store.GetExamCodeById(examObj)
+
+			if err != nil {
+				log.Printf("%v", err)
+			}
+
+			if examObj != 0 {
+				err = a.quizService.DeleteQuizExam(ctx, examId)
+				if err != nil {
+					log.Printf("cooked %v", err)
+				}
+			} else {
+				err = a.quizService.DeleteQuizSubject(ctx, examId)
+				if err != nil {
+					log.Printf("cooked %v", err)
+				}
+			}
+
+			err = a.quizService.SaveQuizQuestions(ctx, retQuestion, questions)
+			if err != nil {
+				log.Printf("cooked %v", err)
+			}
+			a.store, err = a.storeService.UpdateStoreOnQuiz(ctx, a.store)
+			if err != nil {
+				log.Printf("%v", err)
+			}
+		}()
+		writeJSON(w, http.StatusOK, retQuestion)
+	} else {
+
+		now := time.Now().UnixNano()
+		questions, err := a.store.GenerateQuizFromSubject(subject)
+		log.Printf("time taken to generate quiz %d", time.Now().UnixNano()-now)
+
+		if err != nil {
+			handleError(w, err)
+		}
+
+		retQuestion := questions[0]
+		questions = questions[1:]
+		go func() {
+			ctx := context.Background()
+			subId, err := a.store.GetSubjectIdByTitle(subject)
+
+			if err != nil {
+				log.Printf("%v", err)
+			}
+
+			err = a.quizService.DeleteQuizSubject(ctx, subId)
+			if err != nil {
+				log.Printf("cooked %v", err)
+			}
+			err = a.quizService.SaveQuizQuestions(ctx, retQuestion, questions)
+			if err != nil {
+				log.Printf("cooked %v", err)
+			}
+			a.store, err = a.storeService.UpdateStoreOnQuiz(ctx, a.store)
+			if err != nil {
+				log.Printf("%v", err)
+			}
+		}()
+		writeJSON(w, http.StatusOK, retQuestion)
 	}
-
-	retQuestion := questions[0]
-	questions = questions[1:]
-	go func() {
-		ctx := context.Background()
-		examId, err := a.store.GetExamCodeById(examObj)
-
-		if err != nil {
-			log.Printf("%v", err)
-		}
-
-		err = a.quizService.DeleteQuiz(ctx, examId)
-		if err != nil {
-			log.Printf("cooked %v", err)
-		}
-		err = a.quizService.SaveQuizQuestions(ctx, retQuestion, questions)
-		if err != nil {
-			log.Printf("cooked %v", err)
-		}
-		a.store, err = a.storeService.UpdateStoreOnQuiz(ctx, a.store)
-		if err != nil {
-			log.Printf("%v", err)
-		}
-	}()
-	writeJSON(w, http.StatusOK, retQuestion)
 }
 
 func (a *App) GenerateMatching(w http.ResponseWriter, r *http.Request) {

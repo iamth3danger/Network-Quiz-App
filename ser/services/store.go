@@ -211,7 +211,7 @@ func (s *Store) createObjectiveStats() ([]ObjectiveStat, error) {
 func (s *Store) getQuizByExamId(examId int32) ([]Quiz, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	quiz, ok := s.quiz[examId]
+	quiz, ok := s.examQuiz[examId]
 	if !ok {
 		return nil, fmt.Errorf("%w: exam id %d", ErrStoreNotExist, examId)
 	}
@@ -223,13 +223,13 @@ func (s *Store) setQuizQuestionStatus(examId int32, questionID int32, status str
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	quiz, ok := s.quiz[examId]
+	quiz, ok := s.examQuiz[examId]
 	if !ok {
 		return fmt.Errorf("%w: quiz", ErrStoreNotExist)
 	}
 	for i, q := range quiz {
 		if q.ID == questionID {
-			s.quiz[examId][i].Status = status
+			s.examQuiz[examId][i].Status = status
 		}
 	}
 	return nil
@@ -254,6 +254,16 @@ func (s *Store) GetExamCodeById(objective float64) (int32, error) {
 	return examId, nil
 }
 
+func (s *Store) GetSubjectIdByTitle(title string) (int32, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	subId, ok := s.subjectTextId[title]
+	if !ok {
+		return 0, fmt.Errorf("%w: %s", ErrInvalidObjective, title)
+	}
+	return subId, nil
+}
 func (s *Store) getQuestionById(questionId int32) (Question, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

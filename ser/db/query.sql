@@ -130,11 +130,8 @@ UPDATE quiz SET status = 'answered' WHERE question_id = $1 RETURNING *;
 DELETE FROM quiz
 WHERE objective_id = $1;
 
--- name: DeleteQuizWithObjectiveId :exec 
+-- name: DeleteQuizWithSubjectId :exec 
 DELETE FROM quiz WHERE subject_id = $1;
-
-
-
 
 -- name: GetRandomQuestion :one
 SELECT q.id, q.question, q.a, q.b, q.c, q.d, q.answer, q.objective_id, q.term_id
