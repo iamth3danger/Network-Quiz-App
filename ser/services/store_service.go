@@ -26,7 +26,7 @@ func (s *StoreService) NewStore(ctx context.Context) (*Store, error) {
 	if err != nil {
 		return &Store{}, err
 	}
-	questions, questionExamId, err := s.fetchQuestions(ctx)
+	questions, questionExamId, questionSubjectId, err := s.fetchQuestions(ctx)
 	if err != nil {
 		return &Store{}, err
 	}
@@ -65,21 +65,22 @@ func (s *StoreService) NewStore(ctx context.Context) (*Store, error) {
 	}
 
 	return &Store{
-		examIdCode:      examIdCode,
-		examCodeId:      examCodeId,
-		subjectTextId:   subjectTextId,
-		subjectIdText:   subjectIdText,
-		questions:       questions,
-		questionExamId:  questionExamId,
-		quiz:            quiz,
-		terms:           terms,
-		termExamId:      termExamId,
-		ports:           ports,
-		portScores:      portScores,
-		objectiveScores: objectiveScores,
-		autogenScores:   autoGenScores,
-		scores:          scores,
-		matchingQuiz:    matchingQuiz,
+		examIdCode:        examIdCode,
+		examCodeId:        examCodeId,
+		subjectTextId:     subjectTextId,
+		subjectIdText:     subjectIdText,
+		questions:         questions,
+		questionExamId:    questionExamId,
+		questionSubjectId: questionSubjectId,
+		quiz:              quiz,
+		terms:             terms,
+		termExamId:        termExamId,
+		ports:             ports,
+		portScores:        portScores,
+		objectiveScores:   objectiveScores,
+		autogenScores:     autoGenScores,
+		scores:            scores,
+		matchingQuiz:      matchingQuiz,
 	}, nil
 
 }
@@ -194,21 +195,27 @@ func (s *StoreService) fetchSubjects(ctx context.Context) (map[int32]string, map
 	return subjectIdText, subjectTextId, nil
 }
 
-func (s *StoreService) fetchQuestions(ctx context.Context) (map[int32]Question, map[int32][]Question, error) {
+func (s *StoreService) fetchQuestions(ctx context.Context) (map[int32]Question, map[int32][]Question, map[int32][]Question, error) {
 	questions := make(map[int32]Question)
 	questionExamId := make(map[int32][]Question)
+	questionSubjectId := make(map[int32][]Question)
 	questionDb, err := s.queries.GetAllQuestions(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("%w: %w", ErrDBFetch, err)
+		return nil, nil, nil, fmt.Errorf("%w: %w", ErrDBFetch, err)
 	}
 
 	for _, q := range questionDb {
 		qe := questionFromDB(q)
 		questions[qe.ID] = qe
-		questionExamId[qe.ObjectiveID] = append(questionExamId[qe.ObjectiveID], qe)
+		if qe.ObjectiveID != 0 {
+			questionExamId[qe.ObjectiveID] = append(questionExamId[qe.ObjectiveID], qe)
+		} else {
+			questionSubjectId[qe.SubjectID] = append(questionSubjectId[qe.SubjectID], qe)
+		}
+
 	}
 
-	return questions, questionExamId, nil
+	return questions, questionExamId, questionSubjectId, nil
 }
 
 func (s *StoreService) fetchQuiz(ctx context.Context) (map[int32][]Quiz, error) {

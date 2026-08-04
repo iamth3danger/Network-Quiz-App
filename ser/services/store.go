@@ -8,22 +8,23 @@ import (
 )
 
 type Store struct {
-	examIdCode      map[int32]float64
-	examCodeId      map[float64]int32
-	subjectTextId   map[string]int32
-	subjectIdText   map[int32]string
-	questions       map[int32]Question
-	questionExamId  map[int32][]Question
-	scores          map[int32]Scorer
-	objectiveScores map[int32]ObjectiveScore
-	autogenScores   map[Generator]Scorer
-	quiz            map[int32][]Quiz
-	ports           []Port
-	portScores      map[int32]Scorer
-	termExamId      map[string]int32
-	terms           map[string]int32
-	matchingQuiz    []MatchingQuiz
-	mu              sync.RWMutex
+	examIdCode        map[int32]float64
+	examCodeId        map[float64]int32
+	subjectTextId     map[string]int32
+	subjectIdText     map[int32]string
+	questions         map[int32]Question
+	questionExamId    map[int32][]Question
+	questionSubjectId map[int32][]Question
+	scores            map[int32]Scorer
+	objectiveScores   map[int32]ObjectiveScore
+	autogenScores     map[Generator]Scorer
+	quiz              map[int32][]Quiz
+	ports             []Port
+	portScores        map[int32]Scorer
+	termExamId        map[string]int32
+	terms             map[string]int32
+	matchingQuiz      []MatchingQuiz
+	mu                sync.RWMutex
 }
 
 func (s *Store) FetchQuestion(objective float64) (Question, error) {
@@ -86,14 +87,29 @@ func (s *Store) GetQuizAnswered(objective float64) (QuizStatus, error) {
 	return QuizStatus{Count: count}, nil
 }
 
-func (s *Store) GenerateQuiz(objective float64) ([]Question, error) {
+func (s *Store) GenerateQuizFromSubject(title string) ([]Question, error) {
+	subjectId, ok := s.subjectTextId[title]
+
+	if !ok {
+		return nil, fmt.Errorf("%w", ErrInvalidObjective)
+	}
+
+	return s.generateQuiz(s.questionSubjectId[subjectId])
+}
+
+func (s *Store) GenerateQuizFromExam(objective float64) ([]Question, error) {
 	examId, ok := s.examCodeId[objective]
 	if !ok {
 		return nil, fmt.Errorf("%w", ErrInvalidObjective)
 	}
-	questions := questToQuizer(s.questionExamId[examId])
 
-	info := createQuizerInfo(questions, s.scores)
+	return s.generateQuiz(s.questionExamId[examId])
+}
+
+func (s *Store) generateQuiz(questions []Question) ([]Question, error) {
+	q := questToQuizer(questions)
+
+	info := createQuizerInfo(q, s.scores)
 	info.rearrangeArrs()
 
 	return toQuestions(info.makeQuiz()), nil

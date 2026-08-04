@@ -214,7 +214,7 @@ func (a *App) GenerateQuiz(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := time.Now().UnixNano()
-	questions, err := a.store.GenerateQuiz(examObj)
+	questions, err := a.store.GenerateQuizFromExam(examObj)
 	log.Printf("time taken to generate quiz %d", time.Now().UnixNano()-now)
 
 	if err != nil {
@@ -307,6 +307,16 @@ func main() {
 			app.UpdateQuestion(w, r)
 		}
 	})
+
+	http.HandleFunc("/questions/subject", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			app.GetQuestion(w, r)
+		case http.MethodPost:
+			app.UpdateQuestion(w, r)
+		}
+	})
+
 	http.HandleFunc("/matching", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
