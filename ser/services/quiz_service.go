@@ -44,6 +44,7 @@ type Quiz struct {
 	ID          int32  `json:"id"`
 	QuestionID  int32  `json:"question_id"`
 	ObjectiveID int32  `json:"objective_id"`
+	SubjectID   int32  `json:"subject_id"`
 	Status      string `json:"status"`
 }
 
@@ -52,6 +53,7 @@ func quizFromDB(quizDb quiz.Quiz) Quiz {
 		ID:          quizDb.ID,
 		QuestionID:  quizDb.QuestionID.Int32,
 		ObjectiveID: quizDb.ObjectiveID.Int32,
+		SubjectID:   quizDb.SubjectID.Int32,
 		Status:      string(quizDb.Status.QuestionStatus),
 	}
 }

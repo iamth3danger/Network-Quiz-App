@@ -18,7 +18,8 @@ type Store struct {
 	scores            map[int32]Scorer
 	objectiveScores   map[int32]ObjectiveScore
 	autogenScores     map[Generator]Scorer
-	quiz              map[int32][]Quiz
+	examQuiz          map[int32][]Quiz
+	subjectQuiz       map[int32][]Quiz
 	ports             []Port
 	portScores        map[int32]Scorer
 	termExamId        map[string]int32

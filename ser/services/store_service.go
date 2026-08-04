@@ -30,7 +30,7 @@ func (s *StoreService) NewStore(ctx context.Context) (*Store, error) {
 	if err != nil {
 		return &Store{}, err
 	}
-	quiz, err := s.fetchQuiz(ctx)
+	examQuiz, subjectQuiz, err := s.fetchQuiz(ctx)
 	if err != nil {
 		return &Store{}, err
 	}
@@ -72,7 +72,8 @@ func (s *StoreService) NewStore(ctx context.Context) (*Store, error) {
 		questions:         questions,
 		questionExamId:    questionExamId,
 		questionSubjectId: questionSubjectId,
-		quiz:              quiz,
+		examQuiz:          examQuiz,
+		subjectQuiz:       subjectQuiz,
 		terms:             terms,
 		termExamId:        termExamId,
 		ports:             ports,
@@ -97,7 +98,7 @@ func (s *StoreService) UpdateStoreOnQuestion(ctx context.Context, store *Store) 
 		return nil, err
 	}
 
-	quiz, err := s.fetchQuiz(ctx)
+	examQuiz, subQuiz, err := s.fetchQuiz(ctx)
 
 	if err != nil {
 		return nil, err
@@ -105,7 +106,8 @@ func (s *StoreService) UpdateStoreOnQuestion(ctx context.Context, store *Store) 
 
 	store.scores = scores
 	store.objectiveScores = objectiveScores
-	store.quiz = quiz
+	store.examQuiz = examQuiz
+	store.subjectQuiz = subQuiz
 	return store, nil
 }
 
@@ -127,13 +129,14 @@ func (s *StoreService) UpdateStoreOnQuiz(ctx context.Context, store *Store) (*St
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	quiz, err := s.fetchQuiz(ctx)
+	examQuiz, subQuiz, err := s.fetchQuiz(ctx)
 
 	if err != nil {
 		return nil, fmt.Errorf("%w : %w", ErrDBFetch, err)
 	}
 
-	store.quiz = quiz
+	store.examQuiz = examQuiz
+	store.subjectQuiz = subQuiz
 	return store, nil
 }
 
@@ -218,20 +221,25 @@ func (s *StoreService) fetchQuestions(ctx context.Context) (map[int32]Question, 
 	return questions, questionExamId, questionSubjectId, nil
 }
 
-func (s *StoreService) fetchQuiz(ctx context.Context) (map[int32][]Quiz, error) {
-	quizQuestions := make(map[int32][]Quiz)
+func (s *StoreService) fetchQuiz(ctx context.Context) (map[int32][]Quiz, map[int32][]Quiz, error) {
+	examQuiz := make(map[int32][]Quiz)
+	subQuiz := make(map[int32][]Quiz)
 	quizDb, err := s.queries.GetAllQuiz(ctx)
 
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrDBFetch, err)
+		return nil, nil, fmt.Errorf("%w: %w", ErrDBFetch, err)
 	}
 
 	for _, q := range quizDb {
 		qi := quizFromDB(q)
-		quizQuestions[qi.ObjectiveID] = append(quizQuestions[qi.ObjectiveID], qi)
+		if qi.ObjectiveID != 0 {
+			examQuiz[qi.ObjectiveID] = append(examQuiz[qi.ObjectiveID], qi)
+		} else {
+			subQuiz[qi.SubjectID] = append(subQuiz[qi.SubjectID], qi)
+		}
 	}
 
-	return quizQuestions, nil
+	return examQuiz, subQuiz, nil
 }
 
 func (s *StoreService) fetchTerms(ctx context.Context) (map[string]int32, map[string]int32, error) {
