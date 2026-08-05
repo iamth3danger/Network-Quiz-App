@@ -23,18 +23,32 @@ func (q *QuizMap) getQuizById(id int32) ([]Quiz, error) {
 	return quiz, nil
 }
 
-func (q *QuizMap) setQuizQuestionReviewed(examId int32, questionID int32) error {
+func (q *QuizMap) setQuizQuestionReviewed(id int32, questionID int32) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	return q.setQuizQuestionStatus(examId, questionID, "reviewing")
+	return q.setQuizQuestionStatus(id, questionID, "reviewing")
 }
 
-func (q *QuizMap) setQuizQuestionAnswered(examId int32, questionID int32) error {
+func (q *QuizMap) setQuizQuestionAnswered(id int32, questionID int32) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	return q.setQuizQuestionStatus(examId, questionID, "answered")
+	return q.setQuizQuestionStatus(id, questionID, "answered")
+}
+
+func (q *QuizMap) getQuizAnswered(id int32) QuizStatus {
+	quiz := q.data[id]
+	count := 0
+	for _, q := range quiz {
+		if q.Status == "answered" {
+			count++
+		}
+	}
+
+	return QuizStatus{
+		Count: count,
+	}
 }
 
 func (q *QuizMap) setQuizQuestionStatus(id int32, questionID int32, status string) error {
@@ -52,13 +66,11 @@ func (q *QuizMap) setQuizQuestionStatus(id int32, questionID int32, status strin
 }
 
 type Store struct {
-	examIdCode    map[int32]float64
-	examCodeId    map[float64]int32
-	subjectTextId map[string]int32
-	subjectIdText map[int32]string
-	questions     map[int32]Question
-	// questionExamId    map[int32][]Question
-	// questionSubjectId map[int32][]Question
+	examIdCode      map[int32]float64
+	examCodeId      map[float64]int32
+	subjectTextId   map[string]int32
+	subjectIdText   map[int32]string
+	questions       map[int32]Question
 	scores          map[int32]Scorer
 	objectiveScores map[int32]ObjectiveScore
 	autogenScores   map[Generator]Scorer
@@ -79,7 +91,7 @@ func (s *Store) FetchQuestionExam(objective float64) (Question, error) {
 		return Question{}, err
 	}
 
-	return s.FetchQuestion(examId, s.examQuiz)
+	return s.fetchQuestion(examId, s.examQuiz)
 }
 
 func (s *Store) FetchQuestionSubject(subject string) (Question, error) {
@@ -89,10 +101,10 @@ func (s *Store) FetchQuestionSubject(subject string) (Question, error) {
 		return Question{}, err
 	}
 
-	return s.FetchQuestion(subId, s.subjectQuiz)
+	return s.fetchQuestion(subId, s.subjectQuiz)
 }
 
-func (s *Store) FetchQuestion(id int32, quizMap *QuizMap) (Question, error) {
+func (s *Store) fetchQuestion(id int32, quizMap *QuizMap) (Question, error) {
 	var pending []Quiz
 	// quiz, err := s.getQuizByExamId(id)
 	quiz, err := quizMap.getQuizById(id)
@@ -124,6 +136,16 @@ func (s *Store) FetchQuestion(id int32, quizMap *QuizMap) (Question, error) {
 	}
 
 	return s.getQuestionById(pick.QuestionID)
+}
+
+func (s *Store) GetQuizAnsweredBySubject(title string) QuizStatus {
+	id := s.subjectTextId[title]
+	return s.subjectQuiz.getQuizAnswered(id)
+}
+
+func (s *Store) GetQuizAnsweredByExam(examObj float64) QuizStatus {
+	id := s.examCodeId[examObj]
+	return s.examQuiz.getQuizAnswered(id)
 }
 
 func (s *Store) GenerateMatching() []Port {
