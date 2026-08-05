@@ -66,22 +66,24 @@ func (q *QuizMap) setQuizQuestionStatus(id int32, questionID int32, status strin
 }
 
 type Store struct {
-	examIdCode      map[int32]float64
-	examCodeId      map[float64]int32
-	subjectTextId   map[string]int32
-	subjectIdText   map[int32]string
-	questions       map[int32]Question
-	scores          map[int32]Scorer
-	objectiveScores map[int32]ObjectiveScore
-	autogenScores   map[Generator]Scorer
-	examQuiz        *QuizMap
-	subjectQuiz     *QuizMap
-	ports           []Port
-	portScores      map[int32]Scorer
-	termExamId      map[string]int32
-	terms           map[string]int32
-	matchingQuiz    []MatchingQuiz
-	mu              sync.RWMutex
+	examIdCode        map[int32]float64
+	examCodeId        map[float64]int32
+	subjectTextId     map[string]int32
+	subjectIdText     map[int32]string
+	questions         map[int32]Question
+	questionExamId    map[int32][]Question
+	questionSubjectId map[int32][]Question
+	scores            map[int32]Scorer
+	objectiveScores   map[int32]ObjectiveScore
+	autogenScores     map[Generator]Scorer
+	examQuiz          *QuizMap
+	subjectQuiz       *QuizMap
+	ports             []Port
+	portScores        map[int32]Scorer
+	termExamId        map[string]int32
+	terms             map[string]int32
+	matchingQuiz      []MatchingQuiz
+	mu                sync.RWMutex
 }
 
 func (s *Store) FetchQuestionExam(objective float64) (Question, error) {
