@@ -84,6 +84,17 @@ INSERT INTO turns (question_id, turn) VALUES ($1,$2) RETURNING *;
 -- name: CreateOrUpdateTurn :exec
 INSERT INTO turns (question_id, turn) VALUES ($1, $2) ON CONFLICT (question_id) DO UPDATE SET turn = $2;
 
+-- name: UpdateAutogenScoreRight :exec 
+INSERT INTO autogen_scores (subject_id, question, right_count, wrong_count, streak) 
+VALUES ($1, $2, $3, $4, $5) 
+ON CONFLICT (question) DO UPDATE SET right_count = right_count + 1, streak = streak + 1;
+
+
+-- name: UpdateAutogenScoreWrong :exec 
+INSERT INTO autogen_scores (subject_id, question, right_count, wrong_count, streak) 
+VALUES ($1, $2, $3, $4, $5) 
+ON CONFLICT (question) DO UPDATE SET wrong_count = wrong_count + 1, streak = 0;
+
 -- name: GetCurrentTurn :one 
 SELECT turn FROM state WHERE id = 1;
 
