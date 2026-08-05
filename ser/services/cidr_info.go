@@ -11,6 +11,7 @@ import (
 type Generator string
 
 const TotalQuestions = 10
+const CidrSubId = 1
 
 var ErrInvalidGenerator = errors.New("Invalid generator in auto gen")
 
@@ -100,7 +101,7 @@ func (c *CidrGenerator) createQuiz() ([]Question, error) {
 			if err != nil {
 				return nil, err
 			}
-
+			question.SubjectID = CidrSubId
 			quiz = append(quiz, question)
 		}
 	}

@@ -79,7 +79,7 @@ func (s *StoreService) NewStore(ctx context.Context) (*Store, error) {
 		ports:             ports,
 		portScores:        portScores,
 		objectiveScores:   objectiveScores,
-		cidrGenerator:     cidrGen,
+		cidrGenerator:     &cidrGen,
 		scores:            scores,
 		matchingQuiz:      matchingQuiz,
 	}, nil
@@ -302,7 +302,7 @@ func (s *StoreService) fetchAutogenScores(ctx context.Context) (CidrGenerator, e
 	autogenDb, err := s.queries.GetAutoGenScores(ctx)
 
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrDBFetch, err)
+		return CidrGenerator{}, fmt.Errorf("%w: %w", ErrDBFetch, err)
 	}
 
 	for _, score := range autogenDb {

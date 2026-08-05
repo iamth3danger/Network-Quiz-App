@@ -265,6 +265,23 @@ func (s *QuizService) GetQuestionSetByExamId(ctx context.Context, examId int32) 
 	return s.queries.GetQuestionSetByExamId(ctx, pgtype.Int4{Int32: examId, Valid: true})
 }
 
+func (s *QuizService) SaveQuestions(ctx context.Context, vals []Question) ([]Question, error) {
+	params := makeBatchQuestions(vals)
+
+	qDb, err := s.queries.BatchCreateQuestion(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+
+	var questions []Question
+
+	for _, q := range qDb {
+		questions = append(questions, questionFromDB(q))
+	}
+
+	return questions, nil
+}
+
 func (s *QuizService) SaveQuizQuestions(ctx context.Context, reviewed Question, questions []Question) error {
 
 	if reviewed.ObjectiveID != 0 {

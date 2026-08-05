@@ -3,6 +3,18 @@ INSERT INTO questions (objective_id, question, a, b, c, d, answer, term_id)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8) 
        RETURNING *;
 
+-- name: BatchCreateQuestion :many
+INSERT INTO questions (question, subject_id, a, b, c, d, answer) VALUES (
+    unnest(@question::text[]), 
+    unnest(@subject_ids::integer[]), 
+    unnest(@a::text[]),
+    unnest(@b::text[]),
+    unnest(@c::text[]),
+    unnest(@d::text[]),
+    unnest(@answer::text[])
+)
+RETURNING *;
+
 -- name: CreateSubjectQuestion :one
 INSERT INTO questions (subject_id, question, a, b, c, d, answer)
        VALUES ($1,$2,$3,$4,$5,$6,$7)

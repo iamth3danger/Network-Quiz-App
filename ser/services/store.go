@@ -157,6 +157,10 @@ func (s *Store) GenerateQuizFromSubject(title string) ([]Question, error) {
 		return nil, fmt.Errorf("%w", ErrInvalidObjective)
 	}
 
+	if subjectId == 1 {
+		return s.GenerateQuizFromAuto()
+	}
+
 	return s.generateQuiz(s.questionSubjectId[subjectId])
 }
 

@@ -11,6 +11,68 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const batchCreateQuestion = `-- name: BatchCreateQuestion :many
+INSERT INTO questions (question, subject_id, a, b, c, d, answer) VALUES (
+    unnest($1::text[]), 
+    unnest($2::integer[]), 
+    unnest($3::text[]),
+    unnest($4::text[]),
+    unnest($5::text[]),
+    unnest($6::text[]),
+    unnest($7::text[])
+)
+RETURNING id, subject_id, objective_id, question, a, b, c, d, answer, term_id
+`
+
+type BatchCreateQuestionParams struct {
+	Question   []string `json:"question"`
+	SubjectIds []int32  `json:"subject_ids"`
+	A          []string `json:"a"`
+	B          []string `json:"b"`
+	C          []string `json:"c"`
+	D          []string `json:"d"`
+	Answer     []string `json:"answer"`
+}
+
+func (q *Queries) BatchCreateQuestion(ctx context.Context, arg BatchCreateQuestionParams) ([]Question, error) {
+	rows, err := q.db.Query(ctx, batchCreateQuestion,
+		arg.Question,
+		arg.SubjectIds,
+		arg.A,
+		arg.B,
+		arg.C,
+		arg.D,
+		arg.Answer,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Question
+	for rows.Next() {
+		var i Question
+		if err := rows.Scan(
+			&i.ID,
+			&i.SubjectID,
+			&i.ObjectiveID,
+			&i.Question,
+			&i.A,
+			&i.B,
+			&i.C,
+			&i.D,
+			&i.Answer,
+			&i.TermID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const batchQuizQuestionExam = `-- name: BatchQuizQuestionExam :exec
 INSERT INTO quiz (question_id, objective_id, status) VALUES (
     unnest($1::integer[]), 

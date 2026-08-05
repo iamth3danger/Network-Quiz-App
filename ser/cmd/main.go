@@ -329,18 +329,28 @@ func (a *App) GenerateQuiz(w http.ResponseWriter, r *http.Request) {
 		if examObj != 0 {
 			err = a.quizService.DeleteQuizExam(ctx, id)
 			if err != nil {
-				log.Printf("cooked %v", err)
+				log.Printf("cooked deleting quiz exam %v", err)
 			}
 		} else {
 			err = a.quizService.DeleteQuizSubject(ctx, id)
 			if err != nil {
-				log.Printf("cooked %v", err)
+				log.Printf("cooked deleting subject quiz %v", err)
+			}
+
+			if id == 1 {
+				q := append(questions, retQuestion)
+				newVals, err := a.quizService.SaveQuestions(ctx, q)
+				if err != nil {
+					log.Printf("cooked saving questions %v", err)
+				}
+				retQuestion = newVals[0]
+				questions = newVals[1:]
 			}
 		}
 
 		err = a.quizService.SaveQuizQuestions(ctx, retQuestion, questions)
 		if err != nil {
-			log.Printf("cooked %v", err)
+			log.Printf("cooked saving quiz questions %v", err)
 		}
 		a.store, err = a.storeService.UpdateStoreOnQuiz(ctx, a.store)
 		if err != nil {
