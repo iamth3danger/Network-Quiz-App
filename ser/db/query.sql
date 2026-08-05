@@ -210,6 +210,9 @@ SELECT * FROM exam_objectives;
 -- name: GetAllQuestions :many 
 SELECT q.* FROM questions q JOIN terms t ON t.id = q.term_id WHERE t.on_exam = true;
 
+-- name: GetAllSubjectQuestion :many
+SELECT * FROM questions WHERE subject_id IS NOT NULL;
+
 -- name: GetAllScores :many 
 SELECT * FROM scores;
 

@@ -633,6 +633,41 @@ func (q *Queries) GetAllScores(ctx context.Context) ([]Score, error) {
 	return items, nil
 }
 
+const getAllSubjectQuestion = `-- name: GetAllSubjectQuestion :many
+SELECT id, subject_id, objective_id, question, a, b, c, d, answer, term_id FROM questions WHERE subject_id IS NOT NULL
+`
+
+func (q *Queries) GetAllSubjectQuestion(ctx context.Context) ([]Question, error) {
+	rows, err := q.db.Query(ctx, getAllSubjectQuestion)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Question
+	for rows.Next() {
+		var i Question
+		if err := rows.Scan(
+			&i.ID,
+			&i.SubjectID,
+			&i.ObjectiveID,
+			&i.Question,
+			&i.A,
+			&i.B,
+			&i.C,
+			&i.D,
+			&i.Answer,
+			&i.TermID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getAllSubjects = `-- name: GetAllSubjects :many
 SELECT id, title FROM subjects
 `
