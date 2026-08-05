@@ -75,7 +75,7 @@ type Store struct {
 	questionSubjectId map[int32][]Question
 	scores            map[int32]Scorer
 	objectiveScores   map[int32]ObjectiveScore
-	autogenScores     map[Generator]Scorer
+	cidrGenerator     *CidrGenerator
 	examQuiz          *QuizMap
 	subjectQuiz       *QuizMap
 	ports             []Port
@@ -167,6 +167,10 @@ func (s *Store) GenerateQuizFromExam(objective float64) ([]Question, error) {
 	}
 
 	return s.generateQuiz(s.questionExamId[examId])
+}
+
+func (s *Store) GenerateQuizFromAuto() ([]Question, error) {
+	return s.cidrGenerator.createQuiz()
 }
 
 func (s *Store) generateQuiz(questions []Question) ([]Question, error) {

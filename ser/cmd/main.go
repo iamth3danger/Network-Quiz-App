@@ -184,6 +184,7 @@ func parseParams(r *http.Request) (HttpParams, error) {
 	}
 
 	subject, err := parseSubject(r)
+	fmt.Printf("subject: %s\n", subject)
 
 	if err != nil {
 		var e ErrInvalidArg

@@ -51,7 +51,7 @@ func (s *StoreService) NewStore(ctx context.Context) (*Store, error) {
 	if err != nil {
 		return &Store{}, err
 	}
-	autoGenScores, err := s.fetchAutogenScores(ctx)
+	cidrGen, err := s.fetchAutogenScores(ctx)
 	if err != nil {
 		return &Store{}, err
 	}
@@ -79,7 +79,7 @@ func (s *StoreService) NewStore(ctx context.Context) (*Store, error) {
 		ports:             ports,
 		portScores:        portScores,
 		objectiveScores:   objectiveScores,
-		autogenScores:     autoGenScores,
+		cidrGenerator:     cidrGen,
 		scores:            scores,
 		matchingQuiz:      matchingQuiz,
 	}, nil
@@ -206,16 +206,23 @@ func (s *StoreService) fetchQuestions(ctx context.Context) (map[int32]Question, 
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("%w: %w", ErrDBFetch, err)
 	}
+	subQuest, err := s.queries.GetAllSubjectQuestion(ctx)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("%w: %w", ErrDBFetch, err)
+	}
 
 	for _, q := range questionDb {
 		qe := questionFromDB(q)
 		questions[qe.ID] = qe
-		if qe.ObjectiveID != 0 {
-			questionExamId[qe.ObjectiveID] = append(questionExamId[qe.ObjectiveID], qe)
-		} else {
-			questionSubjectId[qe.SubjectID] = append(questionSubjectId[qe.SubjectID], qe)
-		}
+		questionExamId[qe.ObjectiveID] = append(questionExamId[qe.ObjectiveID], qe)
+	}
 
+	// fmt.Printf("len sub quest %d\n", len(subQuest))
+	for _, q := range subQuest {
+		qe := questionFromDB(q)
+		questions[qe.ID] = qe
+		questionSubjectId[qe.SubjectID] = append(questionSubjectId[qe.SubjectID], qe)
+		// fmt.Printf("%d\n", qe.SubjectID)
 	}
 
 	return questions, questionExamId, questionSubjectId, nil
@@ -290,7 +297,7 @@ func (s *StoreService) fetchPortScores(ctx context.Context) (map[int32]Scorer, e
 	return portScores, nil
 }
 
-func (s *StoreService) fetchAutogenScores(ctx context.Context) (map[Generator]Scorer, error) {
+func (s *StoreService) fetchAutogenScores(ctx context.Context) (CidrGenerator, error) {
 	autogenScores := make(map[Generator]Scorer)
 	autogenDb, err := s.queries.GetAutoGenScores(ctx)
 
@@ -316,7 +323,7 @@ func (s *StoreService) fetchAutogenScores(ctx context.Context) (map[Generator]Sc
 		}
 	}
 
-	return autogenScores, nil
+	return CidrGenerator{scoreMap: autogenScores}, nil
 }
 
 func (s *StoreService) fetchObjectiveScores(ctx context.Context) (map[int32]ObjectiveScore, error) {

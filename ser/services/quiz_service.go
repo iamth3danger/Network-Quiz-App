@@ -30,6 +30,7 @@ func questionFromDB(questionDb quiz.Question) Question {
 	return Question{
 		ID:          questionDb.ID,
 		ObjectiveID: questionDb.ObjectiveID.Int32,
+		SubjectID:   questionDb.SubjectID.Int32,
 		Question:    questionDb.Question,
 		A:           questionDb.A,
 		B:           questionDb.B,
