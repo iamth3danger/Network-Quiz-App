@@ -148,6 +148,34 @@ func (s *Store) GetQuizAnsweredByExam(examObj float64) QuizStatus {
 	return s.examQuiz.getQuizAnswered(id)
 }
 
+func (s *Store) GenerateQuizFromSubject(title string) ([]Question, error) {
+	subjectId, ok := s.subjectTextId[title]
+
+	if !ok {
+		return nil, fmt.Errorf("%w", ErrInvalidObjective)
+	}
+
+	return s.generateQuiz(s.questionSubjectId[subjectId])
+}
+
+func (s *Store) GenerateQuizFromExam(objective float64) ([]Question, error) {
+	examId, ok := s.examCodeId[objective]
+	if !ok {
+		return nil, fmt.Errorf("%w", ErrInvalidObjective)
+	}
+
+	return s.generateQuiz(s.questionExamId[examId])
+}
+
+func (s *Store) generateQuiz(questions []Question) ([]Question, error) {
+	q := questToQuizer(questions)
+
+	info := createQuizerInfo(q, s.scores)
+	info.rearrangeArrs()
+
+	return toQuestions(info.makeQuiz()), nil
+}
+
 func (s *Store) GenerateMatching() []Port {
 	ports := portToQuizer(s.ports)
 	info := createQuizerInfo(ports, s.portScores)
