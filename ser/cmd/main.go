@@ -399,15 +399,6 @@ func main() {
 		}
 	})
 
-	http.HandleFunc("/questions/subject", func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodGet:
-			app.GetQuestion(w, r)
-		case http.MethodPost:
-			app.UpdateQuestion(w, r)
-		}
-	})
-
 	http.HandleFunc("/matching", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
