@@ -55,7 +55,7 @@ func (q *QuizMap) setQuizQuestionStatus(id int32, questionID int32, status strin
 
 	quiz, ok := q.data[id]
 	if !ok {
-		return fmt.Errorf("%w: quiz", ErrStoreNotExist)
+		return fmt.Errorf("%w: Quiz", ErrStoreNotExist)
 	}
 	for i, qe := range quiz {
 		if qe.ID == questionID {

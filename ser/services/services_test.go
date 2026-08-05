@@ -2,11 +2,12 @@ package services
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"reflect"
 	"regexp"
 	"strconv"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 type mockScorer struct {
@@ -202,6 +203,31 @@ func extractCIDRPrefix(cidr string) (int, error) {
 	}
 
 	return prefix, nil
+}
+
+func TestGenerateQuizFromSubject(t *testing.T) {
+	questionSubjectId := make(map[int32][]Question)
+	subjectTextId := make(map[string]int32)
+	scores := make(map[int32]Scorer)
+	questionSubjectId[1] = []Question{{ID: 1}, {ID: 2}, {ID: 3}, {ID: 4}, {ID: 5}}
+	subjectTextId["mock"] = 1
+	scores[1] = mockScorer{id: 1, wrong: 2}
+	scores[2] = mockScorer{id: 2, right: 3}
+	scores[3] = mockScorer{id: 3, right: 4}
+	scores[4] = mockScorer{id: 4, wrong: 5}
+	scores[5] = mockScorer{id: 4, right: 5}
+
+	store := &Store{
+		questionSubjectId: questionSubjectId,
+		scores:            scores,
+		subjectTextId:     subjectTextId,
+	}
+
+	_, err := store.GenerateQuizFromSubject("mock")
+
+	if err != nil {
+		t.Fatalf("generating quiz %v", err)
+	}
 }
 
 func extractSubnetMask(s string) string {
