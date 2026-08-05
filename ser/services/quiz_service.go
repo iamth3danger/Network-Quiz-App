@@ -159,6 +159,16 @@ func (s *QuizService) SaveExamObj(ctx context.Context, params ExamObject) error 
 	return err
 }
 
+func (s *QuizService) createAndUpdateAutogenScore(ctx context.Context, generator Generator, correct bool) error {
+	if correct {
+		params := quiz.UpdateAutogenScoreRightParams{SubjectID: pgtype.Int4{Int32: CidrSubId, Valid: true}, Question: string(generator)}
+		return s.queries.UpdateAutogenScoreRight(ctx, params)
+	} else {
+		params := quiz.UpdateAutogenScoreWrongParams{SubjectID: pgtype.Int4{Int32: CidrSubId, Valid: true}, Question: string(generator)}
+		return s.queries.UpdateAutogenScoreWrong(ctx, params)
+	}
+}
+
 func (s *QuizService) createAndUpdateScore(ctx context.Context, questionID int, correct bool) error {
 	_, err := s.findOrCreateScore(ctx, questionID)
 	if err != nil {
