@@ -9,12 +9,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/anthropics/anthropic-sdk-go"
-	"github.com/jackc/pgx/v5"
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
+
+	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/jackc/pgx/v5"
 )
 
 type ErrEmptyParam struct{ Param string }
@@ -210,6 +212,8 @@ func parseSubject(r *http.Request) (string, error) {
 	if subject == "" {
 		return "", ErrEmptyParam{Param: "subject"}
 	}
+
+	subject = strings.ReplaceAll(subject, "_", " ")
 
 	return subject, nil
 }
