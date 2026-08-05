@@ -312,19 +312,27 @@ func (a *App) GenerateQuiz(w http.ResponseWriter, r *http.Request) {
 	questions = questions[1:]
 	go func() {
 		ctx := context.Background()
-		examId, err := a.store.GetExamCodeById(examObj)
 
-		if err != nil {
-			log.Printf("%v", err)
+		var id int32
+		if examObj != 0 {
+			id, err = a.store.GetExamCodeById(examObj)
+			if err != nil {
+				log.Printf("%v", err)
+			}
+		} else {
+			id, err = a.store.GetSubjectIdByTitle(subject)
+			if err != nil {
+				log.Printf("%v", err)
+			}
 		}
 
 		if examObj != 0 {
-			err = a.quizService.DeleteQuizExam(ctx, examId)
+			err = a.quizService.DeleteQuizExam(ctx, id)
 			if err != nil {
 				log.Printf("cooked %v", err)
 			}
 		} else {
-			err = a.quizService.DeleteQuizSubject(ctx, examId)
+			err = a.quizService.DeleteQuizSubject(ctx, id)
 			if err != nil {
 				log.Printf("cooked %v", err)
 			}
