@@ -1672,51 +1672,33 @@ func (q *Queries) TermStats(ctx context.Context) ([]TermStatsRow, error) {
 
 const updateAutogenScoreRight = `-- name: UpdateAutogenScoreRight :exec
 INSERT INTO autogen_scores (subject_id, question, right_count, wrong_count, streak) 
-VALUES ($1, $2, $3, $4, $5) 
+VALUES ($1, $2, 1, 0, 1) 
 ON CONFLICT (question) DO UPDATE SET right_count = right_count + 1, streak = streak + 1
 `
 
 type UpdateAutogenScoreRightParams struct {
-	SubjectID  pgtype.Int4 `json:"subject_id"`
-	Question   string      `json:"question"`
-	RightCount pgtype.Int4 `json:"right_count"`
-	WrongCount pgtype.Int4 `json:"wrong_count"`
-	Streak     pgtype.Int4 `json:"streak"`
+	SubjectID pgtype.Int4 `json:"subject_id"`
+	Question  string      `json:"question"`
 }
 
 func (q *Queries) UpdateAutogenScoreRight(ctx context.Context, arg UpdateAutogenScoreRightParams) error {
-	_, err := q.db.Exec(ctx, updateAutogenScoreRight,
-		arg.SubjectID,
-		arg.Question,
-		arg.RightCount,
-		arg.WrongCount,
-		arg.Streak,
-	)
+	_, err := q.db.Exec(ctx, updateAutogenScoreRight, arg.SubjectID, arg.Question)
 	return err
 }
 
 const updateAutogenScoreWrong = `-- name: UpdateAutogenScoreWrong :exec
 INSERT INTO autogen_scores (subject_id, question, right_count, wrong_count, streak) 
-VALUES ($1, $2, $3, $4, $5) 
+VALUES ($1, $2, 0, 1, 0) 
 ON CONFLICT (question) DO UPDATE SET wrong_count = wrong_count + 1, streak = 0
 `
 
 type UpdateAutogenScoreWrongParams struct {
-	SubjectID  pgtype.Int4 `json:"subject_id"`
-	Question   string      `json:"question"`
-	RightCount pgtype.Int4 `json:"right_count"`
-	WrongCount pgtype.Int4 `json:"wrong_count"`
-	Streak     pgtype.Int4 `json:"streak"`
+	SubjectID pgtype.Int4 `json:"subject_id"`
+	Question  string      `json:"question"`
 }
 
 func (q *Queries) UpdateAutogenScoreWrong(ctx context.Context, arg UpdateAutogenScoreWrongParams) error {
-	_, err := q.db.Exec(ctx, updateAutogenScoreWrong,
-		arg.SubjectID,
-		arg.Question,
-		arg.RightCount,
-		arg.WrongCount,
-		arg.Streak,
-	)
+	_, err := q.db.Exec(ctx, updateAutogenScoreWrong, arg.SubjectID, arg.Question)
 	return err
 }
 
