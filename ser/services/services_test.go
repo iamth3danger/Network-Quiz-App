@@ -536,7 +536,6 @@ func TestGetConvChoices(t *testing.T) {
 		if !checkUniqueDotted(ch.addresses) {
 			t.Fatalf("duplicate values!")
 		}
-
 	}
 
 }

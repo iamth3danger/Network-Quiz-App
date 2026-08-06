@@ -97,7 +97,10 @@ func (s *StoreService) UpdateStoreOnQuestion(ctx context.Context, store *Store) 
 	if err != nil {
 		return nil, err
 	}
-
+	cidrGen, err := s.fetchAutogenScores(ctx)
+	if err != nil {
+		return nil, err
+	}
 	examQuiz, subQuiz, err := s.fetchQuiz(ctx)
 
 	if err != nil {
@@ -108,6 +111,7 @@ func (s *StoreService) UpdateStoreOnQuestion(ctx context.Context, store *Store) 
 	store.objectiveScores = objectiveScores
 	store.examQuiz = examQuiz
 	store.subjectQuiz = subQuiz
+	store.cidrGenerator = &cidrGen
 	return store, nil
 }
 

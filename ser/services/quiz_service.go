@@ -244,21 +244,33 @@ func (s *QuizService) UpdateQuestion(ctx context.Context, question QuestionReque
 	qID := question.QuestionID
 	correct := question.Correct
 	examID := question.ExamObjectiveID
+	subID := question.SubjectID
 
-	err := s.createAndUpdateScore(ctx, qID, correct)
-	if err != nil {
-		return fmt.Errorf("saving / updating score %w", err)
+	if subID == CidrSubId {
+		gen, err := questionToGenerator(question.Question)
+		if err != nil {
+			return fmt.Errorf("question conv %v", err)
+		}
+		err = s.createAndUpdateAutogenScore(ctx, gen, correct)
+		if err != nil {
+			return fmt.Errorf("saving / updating score %w", err)
+		}
+	} else {
+		err := s.createAndUpdateScore(ctx, qID, correct)
+		if err != nil {
+			return fmt.Errorf("saving / updating score %w", err)
+		}
 	}
 
 	if examID != 0 {
-		_, err = s.createOrUpdateObjectiveScore(ctx, examID, correct)
+		_, err := s.createOrUpdateObjectiveScore(ctx, examID, correct)
 
 		if err != nil {
 			return fmt.Errorf("error with objective score %w", err)
 		}
 	}
 
-	_, err = s.queries.SetQuizStatusAnswered(ctx, pgtype.Int4{Int32: int32(qID), Valid: true})
+	_, err := s.queries.SetQuizStatusAnswered(ctx, pgtype.Int4{Int32: int32(qID), Valid: true})
 
 	return err
 }

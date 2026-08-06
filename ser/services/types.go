@@ -11,10 +11,11 @@ type ExamObject struct {
 }
 
 type QuestionRequest struct {
-	QuestionID      int  `json:"question_id"`
-	Correct         bool `json:"correct"`
-	ExamObjectiveID int  `json:"exam_objective_id"`
-	SubjectID       int  `json:"subject_id"`
+	Question        string `json:"question"`
+	QuestionID      int    `json:"question_id"`
+	Correct         bool   `json:"correct"`
+	ExamObjectiveID int    `json:"exam_objective_id"`
+	SubjectID       int    `json:"subject_id"`
 }
 
 type MatchingRequest struct {
