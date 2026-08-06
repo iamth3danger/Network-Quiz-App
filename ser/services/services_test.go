@@ -209,8 +209,8 @@ func TestGenerateQuizFromSubject(t *testing.T) {
 	questionSubjectId := make(map[int32][]Question)
 	subjectTextId := make(map[string]int32)
 	scores := make(map[int32]Scorer)
-	questionSubjectId[1] = []Question{{ID: 1}, {ID: 2}, {ID: 3}, {ID: 4}, {ID: 5}}
-	subjectTextId["mock"] = 1
+	questionSubjectId[2] = []Question{{ID: 1}, {ID: 2}, {ID: 3}, {ID: 4}, {ID: 5}}
+	subjectTextId["mock"] = 2
 	scores[1] = mockScorer{id: 1, wrong: 2}
 	scores[2] = mockScorer{id: 2, right: 3}
 	scores[3] = mockScorer{id: 3, right: 4}
@@ -538,4 +538,64 @@ func TestGetConvChoices(t *testing.T) {
 		}
 
 	}
+
+}
+
+func TestQuestionToGenerator(t *testing.T) {
+	generator, err := questionToGenerator("What is /6 in dotted decimal?")
+
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	if generator != GeneratorSubnet {
+		t.Fatalf("expected %s : actual %s", GeneratorSubnet, generator)
+	}
+
+	generator, err = questionToGenerator("what is 52.91.41.98/23 as a broadcast address")
+
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	if generator != GeneratorBroadcast {
+		t.Fatalf("expected %s : actual %s", GeneratorSubnet, generator)
+	}
+
+	generator, err = questionToGenerator("Convert 255.248.0.0 to CIDR")
+
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	if generator != GeneratorCidr {
+		t.Fatalf("expected %s : actual %s", GeneratorSubnet, generator)
+	}
+
+	generator, err = questionToGenerator("How many usable hosts does /30 have?")
+
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	if generator != GeneratorHost {
+		t.Fatalf("expected %s : actual %s", GeneratorSubnet, generator)
+	}
+
+	generator, err = questionToGenerator("what is 92.132.124.60/7 as a network address?")
+
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	if generator != GeneratorNetwork {
+		t.Fatalf("expected %s : actual %s", GeneratorSubnet, generator)
+	}
+
+	generator, err = questionToGenerator("")
+
+	if err == nil {
+		t.Fatalf("there should be an error here!")
+	}
+
 }

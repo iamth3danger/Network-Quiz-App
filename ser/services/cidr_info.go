@@ -3,9 +3,11 @@ package services
 import (
 	"cmp"
 	"errors"
+	"fmt"
 	"math"
 	"math/rand/v2"
 	"slices"
+	"strings"
 )
 
 type Generator string
@@ -28,6 +30,25 @@ var Generators = []Generator{GeneratorNetwork, GeneratorBroadcast, GeneratorFirs
 
 type CidrGenerator struct {
 	scoreMap map[Generator]Scorer
+}
+
+func questionToGenerator(questionText string) (Generator, error) {
+	switch {
+	case strings.Contains(questionText, "network"):
+		return GeneratorNetwork, nil
+	case strings.Contains(questionText, "broadcast"):
+		return GeneratorBroadcast, nil
+	case strings.Contains(questionText, "first and last"):
+		return GeneratorFirstLastHost, nil
+	case strings.Contains(questionText, "hosts"):
+		return GeneratorHost, nil
+	case strings.Contains(questionText, "dotted decimal"):
+		return GeneratorSubnet, nil
+	case strings.Contains(questionText, "CIDR"):
+		return GeneratorCidr, nil
+	default:
+		return "", fmt.Errorf("converting questionText to generator")
+	}
 }
 
 func autoGenerateQuestion(gen Generator) (Question, error) {
