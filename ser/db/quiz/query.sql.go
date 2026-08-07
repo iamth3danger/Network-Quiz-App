@@ -1673,7 +1673,7 @@ func (q *Queries) TermStats(ctx context.Context) ([]TermStatsRow, error) {
 const updateAutogenScoreRight = `-- name: UpdateAutogenScoreRight :exec
 INSERT INTO autogen_scores (subject_id, question, right_count, wrong_count, streak) 
 VALUES ($1, $2, 1, 0, 1) 
-ON CONFLICT (question) DO UPDATE SET right_count = right_count + 1, streak = streak + 1
+ON CONFLICT (question) DO UPDATE SET right_count = autogen_scores.right_count + 1, streak = autogen_scores.streak + 1
 `
 
 type UpdateAutogenScoreRightParams struct {
@@ -1689,7 +1689,7 @@ func (q *Queries) UpdateAutogenScoreRight(ctx context.Context, arg UpdateAutogen
 const updateAutogenScoreWrong = `-- name: UpdateAutogenScoreWrong :exec
 INSERT INTO autogen_scores (subject_id, question, right_count, wrong_count, streak) 
 VALUES ($1, $2, 0, 1, 0) 
-ON CONFLICT (question) DO UPDATE SET wrong_count = wrong_count + 1, streak = 0
+ON CONFLICT (question) DO UPDATE SET wrong_count = autogen_scores.wrong_count + 1, streak = 0
 `
 
 type UpdateAutogenScoreWrongParams struct {

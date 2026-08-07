@@ -247,11 +247,14 @@ func (s *QuizService) UpdateQuestion(ctx context.Context, question QuestionReque
 	subID := question.SubjectID
 
 	if subID == CidrSubId {
+		fmt.Printf("%v\n", question)
 		gen, err := questionToGenerator(question.Question)
+		fmt.Printf("generator: %s\n", gen)
 		if err != nil {
 			return fmt.Errorf("question conv %v", err)
 		}
 		err = s.createAndUpdateAutogenScore(ctx, gen, correct)
+		fmt.Printf("updating auto gen\n")
 		if err != nil {
 			return fmt.Errorf("saving / updating score %w", err)
 		}
