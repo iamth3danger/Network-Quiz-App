@@ -7,31 +7,109 @@ import (
 	"sync"
 )
 
-type Store struct {
-	examIdCode      map[int32]float64
-	examCodeId      map[float64]int32
-	questions       map[int32]Question
-	questionExamId  map[int32][]Question
-	scores          map[int32]Scorer
-	objectiveScores map[int32]ObjectiveScore
-	quiz            map[int32][]Quiz
-	ports           []Port
-	portScores      map[int32]Scorer
-	termExamId      map[string]int32
-	terms           map[string]int32
-	matchingQuiz    []MatchingQuiz
-	mu              sync.RWMutex
+type QuizMap struct {
+	mu   sync.RWMutex
+	data map[int32][]Quiz
 }
 
-func (s *Store) FetchQuestion(objective float64) (Question, error) {
+func (q *QuizMap) getQuizById(id int32) ([]Quiz, error) {
+	q.mu.RLock()
+	defer q.mu.RUnlock()
+	quiz, ok := q.data[id]
+	if !ok {
+		return nil, fmt.Errorf("%w: exam id %d", ErrStoreNotExist, id)
+	}
+
+	return quiz, nil
+}
+
+func (q *QuizMap) setQuizQuestionReviewed(id int32, questionID int32) error {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	return q.setQuizQuestionStatus(id, questionID, "reviewing")
+}
+
+func (q *QuizMap) setQuizQuestionAnswered(id int32, questionID int32) error {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	return q.setQuizQuestionStatus(id, questionID, "answered")
+}
+
+func (q *QuizMap) getQuizAnswered(id int32) QuizStatus {
+	quiz := q.data[id]
+	count := 0
+	for _, q := range quiz {
+		if q.Status == "answered" {
+			count++
+		}
+	}
+
+	return QuizStatus{
+		Count: count,
+	}
+}
+
+func (q *QuizMap) setQuizQuestionStatus(id int32, questionID int32, status string) error {
+
+	quiz, ok := q.data[id]
+	if !ok {
+		return fmt.Errorf("%w: Quiz", ErrStoreNotExist)
+	}
+	for i, qe := range quiz {
+		if qe.ID == questionID {
+			q.data[id][i].Status = status
+		}
+	}
+	return nil
+}
+
+type Store struct {
+	examIdCode        map[int32]float64
+	examCodeId        map[float64]int32
+	subjectTextId     map[string]int32
+	subjectIdText     map[int32]string
+	questions         map[int32]Question
+	questionExamId    map[int32][]Question
+	questionSubjectId map[int32][]Question
+	scores            map[int32]Scorer
+	objectiveScores   map[int32]ObjectiveScore
+	cidrGenerator     *CidrGenerator
+	examQuiz          *QuizMap
+	subjectQuiz       *QuizMap
+	ports             []Port
+	portScores        map[int32]Scorer
+	termExamId        map[string]int32
+	terms             map[string]int32
+	matchingQuiz      []MatchingQuiz
+	mu                sync.RWMutex
+}
+
+func (s *Store) FetchQuestionExam(objective float64) (Question, error) {
 	examId, err := s.GetExamCodeById(objective)
 
 	if err != nil {
 		return Question{}, err
 	}
 
+	return s.fetchQuestion(examId, s.examQuiz)
+}
+
+func (s *Store) FetchQuestionSubject(subject string) (Question, error) {
+	subId, err := s.GetSubjectIdByTitle(subject)
+
+	if err != nil {
+		return Question{}, err
+	}
+
+	return s.fetchQuestion(subId, s.subjectQuiz)
+}
+
+func (s *Store) fetchQuestion(id int32, quizMap *QuizMap) (Question, error) {
 	var pending []Quiz
-	quiz, err := s.getQuizByExamId(examId)
+	// quiz, err := s.getQuizByExamId(id)
+	quiz, err := quizMap.getQuizById(id)
 
 	if err != nil {
 		return Question{}, err
@@ -52,45 +130,57 @@ func (s *Store) FetchQuestion(objective float64) (Question, error) {
 		return Question{}, ErrStoreNotExist
 	}
 
-	rand.Shuffle(len(pending), func(i, j int) {
-		pending[i], pending[j] = pending[j], pending[i]
-	})
-
-	err = s.setQuizQuestionReviewed(examId, pending[0].ID)
+	pick := pending[rand.Intn(len(pending))]
+	err = quizMap.setQuizQuestionReviewed(id, pick.ID)
 
 	if err != nil {
 		return Question{}, err
 	}
 
-	return s.getQuestionById(pending[0].QuestionID)
+	return s.getQuestionById(pick.QuestionID)
 }
 
-func (s *Store) GetQuizAnswered(objective float64) (QuizStatus, error) {
-	examId, err := s.GetExamCodeById(objective)
-
-	if err != nil {
-		return QuizStatus{}, err
-	}
-
-	quizQuestions, err := s.getQuizByExamId(examId)
-	count := 0
-	for _, q := range quizQuestions {
-		if q.Status == "answered" {
-			count += 1
-		}
-	}
-
-	return QuizStatus{Count: count}, nil
+func (s *Store) GetQuizAnsweredBySubject(title string) QuizStatus {
+	id := s.subjectTextId[title]
+	return s.subjectQuiz.getQuizAnswered(id)
 }
 
-func (s *Store) GenerateQuiz(objective float64) ([]Question, error) {
+func (s *Store) GetQuizAnsweredByExam(examObj float64) QuizStatus {
+	id := s.examCodeId[examObj]
+	return s.examQuiz.getQuizAnswered(id)
+}
+
+func (s *Store) GenerateQuizFromSubject(title string) ([]Question, error) {
+	subjectId, ok := s.subjectTextId[title]
+
+	if !ok {
+		return nil, fmt.Errorf("%w", ErrInvalidObjective)
+	}
+
+	if subjectId == 1 {
+		return s.GenerateQuizFromAuto()
+	}
+
+	return s.generateQuiz(s.questionSubjectId[subjectId])
+}
+
+func (s *Store) GenerateQuizFromExam(objective float64) ([]Question, error) {
 	examId, ok := s.examCodeId[objective]
 	if !ok {
 		return nil, fmt.Errorf("%w", ErrInvalidObjective)
 	}
-	questions := questToQuizer(s.questionExamId[examId])
 
-	info := createQuizerInfo(questions, s.scores)
+	return s.generateQuiz(s.questionExamId[examId])
+}
+
+func (s *Store) GenerateQuizFromAuto() ([]Question, error) {
+	return s.cidrGenerator.createQuiz()
+}
+
+func (s *Store) generateQuiz(questions []Question) ([]Question, error) {
+	q := questToQuizer(questions)
+
+	info := createQuizerInfo(q, s.scores)
 	info.rearrangeArrs()
 
 	return toQuestions(info.makeQuiz()), nil
@@ -188,41 +278,6 @@ func (s *Store) createObjectiveStats() ([]ObjectiveStat, error) {
 	return objectiveStats, nil
 }
 
-func (s *Store) getQuizByExamId(examId int32) ([]Quiz, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	quiz, ok := s.quiz[examId]
-	if !ok {
-		return nil, fmt.Errorf("%w: exam id %d", ErrStoreNotExist, examId)
-	}
-
-	return quiz, nil
-}
-
-func (s *Store) setQuizQuestionStatus(examId int32, questionID int32, status string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	quiz, ok := s.quiz[examId]
-	if !ok {
-		return fmt.Errorf("%w: quiz", ErrStoreNotExist)
-	}
-	for i, q := range quiz {
-		if q.ID == questionID {
-			s.quiz[examId][i].Status = status
-		}
-	}
-	return nil
-}
-
-func (s *Store) setQuizQuestionReviewed(examId int32, questionID int32) error {
-	return s.setQuizQuestionStatus(examId, questionID, "reviewing")
-}
-
-func (s *Store) setQuizQuestionAnswered(examId int32, questionID int32) error {
-	return s.setQuizQuestionStatus(examId, questionID, "answered")
-}
-
 func (s *Store) GetExamCodeById(objective float64) (int32, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -234,6 +289,16 @@ func (s *Store) GetExamCodeById(objective float64) (int32, error) {
 	return examId, nil
 }
 
+func (s *Store) GetSubjectIdByTitle(title string) (int32, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	subId, ok := s.subjectTextId[title]
+	if !ok {
+		return 0, fmt.Errorf("%w: %s", ErrInvalidObjective, title)
+	}
+	return subId, nil
+}
 func (s *Store) getQuestionById(questionId int32) (Question, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

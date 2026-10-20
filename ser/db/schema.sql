@@ -8,6 +8,11 @@ CREATE TABLE IF NOT EXISTS exam_objectives (
   description TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS subjects (
+  id SERIAL PRIMARY KEY,
+  title TEXT NOT NULL UNIQUE
+);
+
 CREATE TABLE IF NOT EXISTS terms (
   id SERIAL PRIMARY KEY,
   objective_id INTEGER REFERENCES exam_objectives(id),
@@ -19,6 +24,7 @@ ALTER TABLE terms ADD CONSTRAINT terms_term_name_key UNIQUE (term_name);
 
 CREATE TABLE IF NOT EXISTS questions (
   id SERIAL PRIMARY KEY,
+  subject_id INTEGER REFERENCES subjects(id),
   objective_id INTEGER REFERENCES exam_objectives(id),
   question TEXT NOT NULL,
   a TEXT NOT NULL,
@@ -37,12 +43,22 @@ CREATE TABLE IF NOT EXISTS scores (
   streak INTEGER DEFAULT 0
 );
 
+CREATE TABLE IF NOT EXISTS autogen_scores(
+  id SERIAL PRIMARY KEY,
+  subject_id INTEGER REFERENCES questions(id) UNIQUE,
+  question TEXT NOT NULL,
+  right_count INTEGER DEFAULT 0,
+  wrong_count INTEGER DEFAULT 0,
+  streak INTEGER DEFAULT 0
+);
+
 CREATE TYPE question_status AS ENUM ('pending', 'reviewing', 'answered');
 
 CREATE TABLE IF NOT EXISTS quiz (
   id SERIAL PRIMARY KEY,
   question_id INTEGER REFERENCES questions(id) UNIQUE,
   objective_id INTEGER REFERENCES exam_objectives(id),
+  subject_id INTEGER REFERENCES subjects(id),
   status question_status
 );
 

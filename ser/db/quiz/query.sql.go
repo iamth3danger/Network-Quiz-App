@@ -11,7 +11,69 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const batchQuizQuestion = `-- name: BatchQuizQuestion :exec
+const batchCreateQuestion = `-- name: BatchCreateQuestion :many
+INSERT INTO questions (question, subject_id, a, b, c, d, answer) VALUES (
+    unnest($1::text[]), 
+    unnest($2::integer[]), 
+    unnest($3::text[]),
+    unnest($4::text[]),
+    unnest($5::text[]),
+    unnest($6::text[]),
+    unnest($7::text[])
+)
+RETURNING id, subject_id, objective_id, question, a, b, c, d, answer, term_id
+`
+
+type BatchCreateQuestionParams struct {
+	Question   []string `json:"question"`
+	SubjectIds []int32  `json:"subject_ids"`
+	A          []string `json:"a"`
+	B          []string `json:"b"`
+	C          []string `json:"c"`
+	D          []string `json:"d"`
+	Answer     []string `json:"answer"`
+}
+
+func (q *Queries) BatchCreateQuestion(ctx context.Context, arg BatchCreateQuestionParams) ([]Question, error) {
+	rows, err := q.db.Query(ctx, batchCreateQuestion,
+		arg.Question,
+		arg.SubjectIds,
+		arg.A,
+		arg.B,
+		arg.C,
+		arg.D,
+		arg.Answer,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Question
+	for rows.Next() {
+		var i Question
+		if err := rows.Scan(
+			&i.ID,
+			&i.SubjectID,
+			&i.ObjectiveID,
+			&i.Question,
+			&i.A,
+			&i.B,
+			&i.C,
+			&i.D,
+			&i.Answer,
+			&i.TermID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const batchQuizQuestionExam = `-- name: BatchQuizQuestionExam :exec
 INSERT INTO quiz (question_id, objective_id, status) VALUES (
     unnest($1::integer[]), 
     unnest($2::integer[]), 
@@ -19,14 +81,33 @@ INSERT INTO quiz (question_id, objective_id, status) VALUES (
 )
 `
 
-type BatchQuizQuestionParams struct {
+type BatchQuizQuestionExamParams struct {
 	QuestionIds  []int32  `json:"question_ids"`
 	ObjectiveIds []int32  `json:"objective_ids"`
 	Status       []string `json:"status"`
 }
 
-func (q *Queries) BatchQuizQuestion(ctx context.Context, arg BatchQuizQuestionParams) error {
-	_, err := q.db.Exec(ctx, batchQuizQuestion, arg.QuestionIds, arg.ObjectiveIds, arg.Status)
+func (q *Queries) BatchQuizQuestionExam(ctx context.Context, arg BatchQuizQuestionExamParams) error {
+	_, err := q.db.Exec(ctx, batchQuizQuestionExam, arg.QuestionIds, arg.ObjectiveIds, arg.Status)
+	return err
+}
+
+const batchQuizQuestionSubject = `-- name: BatchQuizQuestionSubject :exec
+INSERT INTO quiz (question_id, subject_id, status) VALUES (
+    unnest($1::integer[]), 
+    unnest($2::integer[]), 
+    unnest($3::text[])::question_status
+)
+`
+
+type BatchQuizQuestionSubjectParams struct {
+	QuestionIds []int32  `json:"question_ids"`
+	SubjectIds  []int32  `json:"subject_ids"`
+	Status      []string `json:"status"`
+}
+
+func (q *Queries) BatchQuizQuestionSubject(ctx context.Context, arg BatchQuizQuestionSubjectParams) error {
+	_, err := q.db.Exec(ctx, batchQuizQuestionSubject, arg.QuestionIds, arg.SubjectIds, arg.Status)
 	return err
 }
 
@@ -71,6 +152,19 @@ func (q *Queries) CreateObjectiveScore(ctx context.Context, objectiveID pgtype.I
 	return i, err
 }
 
+const createOrGetSubject = `-- name: CreateOrGetSubject :one
+INSERT INTO subjects (title) VALUES ($1)
+ON CONFLICT (title) DO UPDATE SET title = EXCLUDED.title
+RETURNING id
+`
+
+func (q *Queries) CreateOrGetSubject(ctx context.Context, title string) (int32, error) {
+	row := q.db.QueryRow(ctx, createOrGetSubject, title)
+	var id int32
+	err := row.Scan(&id)
+	return id, err
+}
+
 const createOrUpdateTurn = `-- name: CreateOrUpdateTurn :exec
 INSERT INTO turns (question_id, turn) VALUES ($1, $2) ON CONFLICT (question_id) DO UPDATE SET turn = $2
 `
@@ -107,7 +201,7 @@ func (q *Queries) CreatePorts(ctx context.Context, arg CreatePortsParams) error 
 const createQuestion = `-- name: CreateQuestion :one
 INSERT INTO questions (objective_id, question, a, b, c, d, answer, term_id)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8) 
-       RETURNING id, objective_id, question, a, b, c, d, answer, term_id
+       RETURNING id, subject_id, objective_id, question, a, b, c, d, answer, term_id
 `
 
 type CreateQuestionParams struct {
@@ -135,6 +229,7 @@ func (q *Queries) CreateQuestion(ctx context.Context, arg CreateQuestionParams) 
 	var i Question
 	err := row.Scan(
 		&i.ID,
+		&i.SubjectID,
 		&i.ObjectiveID,
 		&i.Question,
 		&i.A,
@@ -148,22 +243,29 @@ func (q *Queries) CreateQuestion(ctx context.Context, arg CreateQuestionParams) 
 }
 
 const createQuizQuestion = `-- name: CreateQuizQuestion :one
-INSERT INTO quiz (question_id, objective_id, status) VALUES ($1, $2, $3) RETURNING id, question_id, objective_id, status
+INSERT INTO quiz (question_id, objective_id, subject_id, status) VALUES ($1, $2, $3, $4) RETURNING id, question_id, objective_id, subject_id, status
 `
 
 type CreateQuizQuestionParams struct {
 	QuestionID  pgtype.Int4        `json:"question_id"`
 	ObjectiveID pgtype.Int4        `json:"objective_id"`
+	SubjectID   pgtype.Int4        `json:"subject_id"`
 	Status      NullQuestionStatus `json:"status"`
 }
 
 func (q *Queries) CreateQuizQuestion(ctx context.Context, arg CreateQuizQuestionParams) (Quiz, error) {
-	row := q.db.QueryRow(ctx, createQuizQuestion, arg.QuestionID, arg.ObjectiveID, arg.Status)
+	row := q.db.QueryRow(ctx, createQuizQuestion,
+		arg.QuestionID,
+		arg.ObjectiveID,
+		arg.SubjectID,
+		arg.Status,
+	)
 	var i Quiz
 	err := row.Scan(
 		&i.ID,
 		&i.QuestionID,
 		&i.ObjectiveID,
+		&i.SubjectID,
 		&i.Status,
 	)
 	return i, err
@@ -211,6 +313,48 @@ func (q *Queries) CreateState(ctx context.Context, arg CreateStateParams) (State
 	row := q.db.QueryRow(ctx, createState, arg.Turn, arg.ObjectiveID)
 	var i State
 	err := row.Scan(&i.ID, &i.Turn, &i.ObjectiveID)
+	return i, err
+}
+
+const createSubjectQuestion = `-- name: CreateSubjectQuestion :one
+INSERT INTO questions (subject_id, question, a, b, c, d, answer)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)
+       RETURNING id, subject_id, objective_id, question, a, b, c, d, answer, term_id
+`
+
+type CreateSubjectQuestionParams struct {
+	SubjectID pgtype.Int4 `json:"subject_id"`
+	Question  string      `json:"question"`
+	A         string      `json:"a"`
+	B         string      `json:"b"`
+	C         string      `json:"c"`
+	D         string      `json:"d"`
+	Answer    string      `json:"answer"`
+}
+
+func (q *Queries) CreateSubjectQuestion(ctx context.Context, arg CreateSubjectQuestionParams) (Question, error) {
+	row := q.db.QueryRow(ctx, createSubjectQuestion,
+		arg.SubjectID,
+		arg.Question,
+		arg.A,
+		arg.B,
+		arg.C,
+		arg.D,
+		arg.Answer,
+	)
+	var i Question
+	err := row.Scan(
+		&i.ID,
+		&i.SubjectID,
+		&i.ObjectiveID,
+		&i.Question,
+		&i.A,
+		&i.B,
+		&i.C,
+		&i.D,
+		&i.Answer,
+		&i.TermID,
+	)
 	return i, err
 }
 
@@ -270,6 +414,15 @@ WHERE objective_id = $1
 
 func (q *Queries) DeleteQuizWithExamId(ctx context.Context, objectiveID pgtype.Int4) error {
 	_, err := q.db.Exec(ctx, deleteQuizWithExamId, objectiveID)
+	return err
+}
+
+const deleteQuizWithSubjectId = `-- name: DeleteQuizWithSubjectId :exec
+DELETE FROM quiz WHERE subject_id = $1
+`
+
+func (q *Queries) DeleteQuizWithSubjectId(ctx context.Context, subjectID pgtype.Int4) error {
+	_, err := q.db.Exec(ctx, deleteQuizWithSubjectId, subjectID)
 	return err
 }
 
@@ -448,7 +601,7 @@ func (q *Queries) GetAllPorts(ctx context.Context) ([]Port, error) {
 }
 
 const getAllQuestions = `-- name: GetAllQuestions :many
-SELECT q.id, q.objective_id, q.question, q.a, q.b, q.c, q.d, q.answer, q.term_id FROM questions q JOIN terms t ON t.id = q.term_id WHERE t.on_exam = true
+SELECT q.id, q.subject_id, q.objective_id, q.question, q.a, q.b, q.c, q.d, q.answer, q.term_id FROM questions q JOIN terms t ON t.id = q.term_id WHERE t.on_exam = true
 `
 
 func (q *Queries) GetAllQuestions(ctx context.Context) ([]Question, error) {
@@ -462,6 +615,7 @@ func (q *Queries) GetAllQuestions(ctx context.Context) ([]Question, error) {
 		var i Question
 		if err := rows.Scan(
 			&i.ID,
+			&i.SubjectID,
 			&i.ObjectiveID,
 			&i.Question,
 			&i.A,
@@ -482,7 +636,7 @@ func (q *Queries) GetAllQuestions(ctx context.Context) ([]Question, error) {
 }
 
 const getAllQuiz = `-- name: GetAllQuiz :many
-SELECT id, question_id, objective_id, status FROM quiz
+SELECT id, question_id, objective_id, subject_id, status FROM quiz
 `
 
 func (q *Queries) GetAllQuiz(ctx context.Context) ([]Quiz, error) {
@@ -498,6 +652,7 @@ func (q *Queries) GetAllQuiz(ctx context.Context) ([]Quiz, error) {
 			&i.ID,
 			&i.QuestionID,
 			&i.ObjectiveID,
+			&i.SubjectID,
 			&i.Status,
 		); err != nil {
 			return nil, err
@@ -540,6 +695,65 @@ func (q *Queries) GetAllScores(ctx context.Context) ([]Score, error) {
 	return items, nil
 }
 
+const getAllSubjectQuestion = `-- name: GetAllSubjectQuestion :many
+SELECT id, subject_id, objective_id, question, a, b, c, d, answer, term_id FROM questions WHERE subject_id IS NOT NULL
+`
+
+func (q *Queries) GetAllSubjectQuestion(ctx context.Context) ([]Question, error) {
+	rows, err := q.db.Query(ctx, getAllSubjectQuestion)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Question
+	for rows.Next() {
+		var i Question
+		if err := rows.Scan(
+			&i.ID,
+			&i.SubjectID,
+			&i.ObjectiveID,
+			&i.Question,
+			&i.A,
+			&i.B,
+			&i.C,
+			&i.D,
+			&i.Answer,
+			&i.TermID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAllSubjects = `-- name: GetAllSubjects :many
+SELECT id, title FROM subjects
+`
+
+func (q *Queries) GetAllSubjects(ctx context.Context) ([]Subject, error) {
+	rows, err := q.db.Query(ctx, getAllSubjects)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Subject
+	for rows.Next() {
+		var i Subject
+		if err := rows.Scan(&i.ID, &i.Title); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getAllTerms = `-- name: GetAllTerms :many
 SELECT id, objective_id, term_name, on_exam FROM terms
 `
@@ -570,7 +784,7 @@ func (q *Queries) GetAllTerms(ctx context.Context) ([]Term, error) {
 }
 
 const getAllWrongQuestions = `-- name: GetAllWrongQuestions :many
-SELECT q.id, q.objective_id, q.question, q.a, q.b, q.c, q.d, q.answer, q.term_id FROM questions q 
+SELECT q.id, q.subject_id, q.objective_id, q.question, q.a, q.b, q.c, q.d, q.answer, q.term_id FROM questions q 
 JOIN scores s on s.question_id = q.id 
 WHERE s.wrong_count > 0
 AND s.streak = 0
@@ -587,6 +801,7 @@ func (q *Queries) GetAllWrongQuestions(ctx context.Context) ([]Question, error) 
 		var i Question
 		if err := rows.Scan(
 			&i.ID,
+			&i.SubjectID,
 			&i.ObjectiveID,
 			&i.Question,
 			&i.A,
@@ -595,6 +810,37 @@ func (q *Queries) GetAllWrongQuestions(ctx context.Context) ([]Question, error) 
 			&i.D,
 			&i.Answer,
 			&i.TermID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAutoGenScores = `-- name: GetAutoGenScores :many
+SELECT id, subject_id, question, right_count, wrong_count, streak FROM autogen_scores
+`
+
+func (q *Queries) GetAutoGenScores(ctx context.Context) ([]AutogenScore, error) {
+	rows, err := q.db.Query(ctx, getAutoGenScores)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AutogenScore
+	for rows.Next() {
+		var i AutogenScore
+		if err := rows.Scan(
+			&i.ID,
+			&i.SubjectID,
+			&i.Question,
+			&i.RightCount,
+			&i.WrongCount,
+			&i.Streak,
 		); err != nil {
 			return nil, err
 		}
@@ -985,6 +1231,31 @@ func (q *Queries) GetQuestionsByIds(ctx context.Context, ids []int32) ([]string,
 	return items, nil
 }
 
+const getQuestionsBySubjectId = `-- name: GetQuestionsBySubjectId :many
+SELECT question FROM questions
+                WHERE subject_id = $1
+`
+
+func (q *Queries) GetQuestionsBySubjectId(ctx context.Context, subjectID pgtype.Int4) ([]string, error) {
+	rows, err := q.db.Query(ctx, getQuestionsBySubjectId, subjectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var question string
+		if err := rows.Scan(&question); err != nil {
+			return nil, err
+		}
+		items = append(items, question)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getRandomQuestion = `-- name: GetRandomQuestion :one
 SELECT q.id, q.question, q.a, q.b, q.c, q.d, q.answer, q.objective_id, q.term_id
 FROM questions q
@@ -1025,13 +1296,14 @@ func (q *Queries) GetRandomQuestion(ctx context.Context, objectiveID pgtype.Int4
 }
 
 const getReviewedQuestions = `-- name: GetReviewedQuestions :many
-SELECT q.id, q.objective_id, q.question, q.a, q.b, q.c, q.d, q.answer, q.term_id, s.id, s.question_id, s.right_count, s.wrong_count, s.streak FROM questions q
+SELECT q.id, q.subject_id, q.objective_id, q.question, q.a, q.b, q.c, q.d, q.answer, q.term_id, s.id, s.question_id, s.right_count, s.wrong_count, s.streak FROM questions q
                   JOIN scores s ON s.question_id = q.id
                   AND q.objective_id = $1
 `
 
 type GetReviewedQuestionsRow struct {
 	ID          int32       `json:"id"`
+	SubjectID   pgtype.Int4 `json:"subject_id"`
 	ObjectiveID pgtype.Int4 `json:"objective_id"`
 	Question    string      `json:"question"`
 	A           string      `json:"a"`
@@ -1058,6 +1330,7 @@ func (q *Queries) GetReviewedQuestions(ctx context.Context, objectiveID pgtype.I
 		var i GetReviewedQuestionsRow
 		if err := rows.Scan(
 			&i.ID,
+			&i.SubjectID,
 			&i.ObjectiveID,
 			&i.Question,
 			&i.A,
@@ -1097,6 +1370,17 @@ func (q *Queries) GetScoreByQuestionId(ctx context.Context, questionID pgtype.In
 		&i.Streak,
 	)
 	return i, err
+}
+
+const getSubjectIdByTitle = `-- name: GetSubjectIdByTitle :one
+SELECT id FROM subjects WHERE title = $1
+`
+
+func (q *Queries) GetSubjectIdByTitle(ctx context.Context, title string) (int32, error) {
+	row := q.db.QueryRow(ctx, getSubjectIdByTitle, title)
+	var id int32
+	err := row.Scan(&id)
+	return id, err
 }
 
 const getTermIds = `-- name: GetTermIds :many
@@ -1215,7 +1499,7 @@ func (q *Queries) GetTermsByObjectiveId(ctx context.Context, objectiveID pgtype.
 }
 
 const getWrongQuestionsByExam = `-- name: GetWrongQuestionsByExam :many
-SELECT q.id, q.objective_id, q.question, q.a, q.b, q.c, q.d, q.answer, q.term_id FROM questions q 
+SELECT q.id, q.subject_id, q.objective_id, q.question, q.a, q.b, q.c, q.d, q.answer, q.term_id FROM questions q 
 JOIN scores s on s.question_id = q.id 
 WHERE s.wrong_count > 0
 AND s.streak = 0
@@ -1233,6 +1517,7 @@ func (q *Queries) GetWrongQuestionsByExam(ctx context.Context, objectiveID pgtyp
 		var i Question
 		if err := rows.Scan(
 			&i.ID,
+			&i.SubjectID,
 			&i.ObjectiveID,
 			&i.Question,
 			&i.A,
@@ -1253,7 +1538,7 @@ func (q *Queries) GetWrongQuestionsByExam(ctx context.Context, objectiveID pgtyp
 }
 
 const setQuizStatusAnswered = `-- name: SetQuizStatusAnswered :one
-UPDATE quiz SET status = 'answered' WHERE question_id = $1 RETURNING id, question_id, objective_id, status
+UPDATE quiz SET status = 'answered' WHERE question_id = $1 RETURNING id, question_id, objective_id, subject_id, status
 `
 
 func (q *Queries) SetQuizStatusAnswered(ctx context.Context, questionID pgtype.Int4) (Quiz, error) {
@@ -1263,13 +1548,14 @@ func (q *Queries) SetQuizStatusAnswered(ctx context.Context, questionID pgtype.I
 		&i.ID,
 		&i.QuestionID,
 		&i.ObjectiveID,
+		&i.SubjectID,
 		&i.Status,
 	)
 	return i, err
 }
 
 const setQuizStatusPending = `-- name: SetQuizStatusPending :one
-UPDATE quiz SET status = 'pending' WHERE question_id = $1 RETURNING id, question_id, objective_id, status
+UPDATE quiz SET status = 'pending' WHERE question_id = $1 RETURNING id, question_id, objective_id, subject_id, status
 `
 
 func (q *Queries) SetQuizStatusPending(ctx context.Context, questionID pgtype.Int4) (Quiz, error) {
@@ -1279,13 +1565,14 @@ func (q *Queries) SetQuizStatusPending(ctx context.Context, questionID pgtype.In
 		&i.ID,
 		&i.QuestionID,
 		&i.ObjectiveID,
+		&i.SubjectID,
 		&i.Status,
 	)
 	return i, err
 }
 
 const setQuizStatusReviewing = `-- name: SetQuizStatusReviewing :one
-UPDATE quiz SET status = 'reviewing' WHERE question_id = $1 RETURNING id, question_id, objective_id, status
+UPDATE quiz SET status = 'reviewing' WHERE question_id = $1 RETURNING id, question_id, objective_id, subject_id, status
 `
 
 func (q *Queries) SetQuizStatusReviewing(ctx context.Context, questionID pgtype.Int4) (Quiz, error) {
@@ -1295,6 +1582,7 @@ func (q *Queries) SetQuizStatusReviewing(ctx context.Context, questionID pgtype.
 		&i.ID,
 		&i.QuestionID,
 		&i.ObjectiveID,
+		&i.SubjectID,
 		&i.Status,
 	)
 	return i, err
@@ -1380,6 +1668,38 @@ func (q *Queries) TermStats(ctx context.Context) ([]TermStatsRow, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateAutogenScoreRight = `-- name: UpdateAutogenScoreRight :exec
+INSERT INTO autogen_scores (subject_id, question, right_count, wrong_count, streak) 
+VALUES ($1, $2, 1, 0, 1) 
+ON CONFLICT (question) DO UPDATE SET right_count = autogen_scores.right_count + 1, streak = autogen_scores.streak + 1
+`
+
+type UpdateAutogenScoreRightParams struct {
+	SubjectID pgtype.Int4 `json:"subject_id"`
+	Question  string      `json:"question"`
+}
+
+func (q *Queries) UpdateAutogenScoreRight(ctx context.Context, arg UpdateAutogenScoreRightParams) error {
+	_, err := q.db.Exec(ctx, updateAutogenScoreRight, arg.SubjectID, arg.Question)
+	return err
+}
+
+const updateAutogenScoreWrong = `-- name: UpdateAutogenScoreWrong :exec
+INSERT INTO autogen_scores (subject_id, question, right_count, wrong_count, streak) 
+VALUES ($1, $2, 0, 1, 0) 
+ON CONFLICT (question) DO UPDATE SET wrong_count = autogen_scores.wrong_count + 1, streak = 0
+`
+
+type UpdateAutogenScoreWrongParams struct {
+	SubjectID pgtype.Int4 `json:"subject_id"`
+	Question  string      `json:"question"`
+}
+
+func (q *Queries) UpdateAutogenScoreWrong(ctx context.Context, arg UpdateAutogenScoreWrongParams) error {
+	_, err := q.db.Exec(ctx, updateAutogenScoreWrong, arg.SubjectID, arg.Question)
+	return err
 }
 
 const updateObjectiveScoreRight = `-- name: UpdateObjectiveScoreRight :one

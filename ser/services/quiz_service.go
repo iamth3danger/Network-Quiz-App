@@ -12,6 +12,7 @@ import (
 type Question struct {
 	ID          int32  `json:"id"`
 	ObjectiveID int32  `json:"objective_id"`
+	SubjectID   int32  `json:"subject_id"`
 	Question    string `json:"question"`
 	A           string `json:"a"`
 	B           string `json:"b"`
@@ -29,6 +30,7 @@ func questionFromDB(questionDb quiz.Question) Question {
 	return Question{
 		ID:          questionDb.ID,
 		ObjectiveID: questionDb.ObjectiveID.Int32,
+		SubjectID:   questionDb.SubjectID.Int32,
 		Question:    questionDb.Question,
 		A:           questionDb.A,
 		B:           questionDb.B,
@@ -43,6 +45,7 @@ type Quiz struct {
 	ID          int32  `json:"id"`
 	QuestionID  int32  `json:"question_id"`
 	ObjectiveID int32  `json:"objective_id"`
+	SubjectID   int32  `json:"subject_id"`
 	Status      string `json:"status"`
 }
 
@@ -51,6 +54,7 @@ func quizFromDB(quizDb quiz.Quiz) Quiz {
 		ID:          quizDb.ID,
 		QuestionID:  quizDb.QuestionID.Int32,
 		ObjectiveID: quizDb.ObjectiveID.Int32,
+		SubjectID:   quizDb.SubjectID.Int32,
 		Status:      string(quizDb.Status.QuestionStatus),
 	}
 }
@@ -89,6 +93,19 @@ func scoreFromDB(scoreDb quiz.Score) Score {
 	}
 }
 
+func autoScoreFromDB(autoDb quiz.AutogenScore, genMap map[Generator]Scorer) {
+	gen := Generator(autoDb.Question)
+	score := Score{
+		RightCount: autoDb.RightCount.Int32,
+		WrongCount: autoDb.WrongCount.Int32,
+		Streak:     autoDb.Streak.Int32,
+	}
+
+	var scorer Scorer = &score
+
+	genMap[gen] = Scorer(scorer)
+}
+
 type ObjectiveScore struct {
 	ID          int32 `json:"id"`
 	ObjectiveID int32 `json:"objective_id"`
@@ -115,8 +132,12 @@ func NewQuizService(q *quiz.Queries) QuizService {
 	}
 }
 
-func (s *QuizService) DeleteQuiz(ctx context.Context, examId int32) error {
+func (s *QuizService) DeleteQuizExam(ctx context.Context, examId int32) error {
 	return s.queries.DeleteQuizWithExamId(ctx, pgtype.Int4{Int32: examId, Valid: true})
+}
+
+func (s *QuizService) DeleteQuizSubject(ctx context.Context, subjectId int32) error {
+	return s.queries.DeleteQuizWithSubjectId(ctx, pgtype.Int4{Int32: subjectId, Valid: true})
 }
 
 func (s *QuizService) SetQuizStatusReviewing(ctx context.Context, questionId int32) error {
@@ -136,6 +157,16 @@ func (s *QuizService) SaveExamObj(ctx context.Context, params ExamObject) error 
 
 	err := s.queries.CreateExamObj(ctx, examParams)
 	return err
+}
+
+func (s *QuizService) createAndUpdateAutogenScore(ctx context.Context, generator Generator, correct bool) error {
+	if correct {
+		params := quiz.UpdateAutogenScoreRightParams{SubjectID: pgtype.Int4{Int32: CidrSubId, Valid: true}, Question: string(generator)}
+		return s.queries.UpdateAutogenScoreRight(ctx, params)
+	} else {
+		params := quiz.UpdateAutogenScoreWrongParams{SubjectID: pgtype.Int4{Int32: CidrSubId, Valid: true}, Question: string(generator)}
+		return s.queries.UpdateAutogenScoreWrong(ctx, params)
+	}
 }
 
 func (s *QuizService) createAndUpdateScore(ctx context.Context, questionID int, correct bool) error {
@@ -213,21 +244,36 @@ func (s *QuizService) UpdateQuestion(ctx context.Context, question QuestionReque
 	qID := question.QuestionID
 	correct := question.Correct
 	examID := question.ExamObjectiveID
+	subID := question.SubjectID
 
-	err := s.createAndUpdateScore(ctx, qID, correct)
-	if err != nil {
-		return fmt.Errorf("saving / updating score %w", err)
+	if subID == CidrSubId {
+		fmt.Printf("%v\n", question)
+		gen, err := questionToGenerator(question.Question)
+		fmt.Printf("generator: %s\n", gen)
+		if err != nil {
+			return fmt.Errorf("question conv %v", err)
+		}
+		err = s.createAndUpdateAutogenScore(ctx, gen, correct)
+		fmt.Printf("updating auto gen\n")
+		if err != nil {
+			return fmt.Errorf("saving / updating score %w", err)
+		}
+	} else {
+		err := s.createAndUpdateScore(ctx, qID, correct)
+		if err != nil {
+			return fmt.Errorf("saving / updating score %w", err)
+		}
 	}
 
 	if examID != 0 {
-		_, err = s.createOrUpdateObjectiveScore(ctx, examID, correct)
+		_, err := s.createOrUpdateObjectiveScore(ctx, examID, correct)
 
 		if err != nil {
 			return fmt.Errorf("error with objective score %w", err)
 		}
 	}
 
-	_, err = s.queries.SetQuizStatusAnswered(ctx, pgtype.Int4{Int32: int32(qID), Valid: true})
+	_, err := s.queries.SetQuizStatusAnswered(ctx, pgtype.Int4{Int32: int32(qID), Valid: true})
 
 	return err
 }
@@ -244,17 +290,52 @@ func (s *QuizService) GetQuestionSetByExamId(ctx context.Context, examId int32) 
 	return s.queries.GetQuestionSetByExamId(ctx, pgtype.Int4{Int32: examId, Valid: true})
 }
 
-func (s *QuizService) SaveQuizQuestions(ctx context.Context, reviewed Question, questions []Question) error {
-	_, err := s.queries.CreateQuizQuestion(ctx, quiz.CreateQuizQuestionParams{
-		QuestionID:  pgtype.Int4{Int32: reviewed.ID, Valid: true},
-		ObjectiveID: pgtype.Int4{Int32: reviewed.ObjectiveID, Valid: true},
-		Status:      quiz.NullQuestionStatus{QuestionStatus: quiz.QuestionStatusReviewing, Valid: true},
-	})
+func (s *QuizService) SaveQuestions(ctx context.Context, vals []Question) ([]Question, error) {
+	params := makeBatchQuestions(vals)
 
+	qDb, err := s.queries.BatchCreateQuestion(ctx, params)
 	if err != nil {
-		return fmt.Errorf("%w: %w", ErrDBFetch, err)
+		return nil, err
 	}
 
-	quizQuestion := makeBatchQuizQuestion(questions)
-	return s.queries.BatchQuizQuestion(ctx, quizQuestion)
+	var questions []Question
+
+	for _, q := range qDb {
+		questions = append(questions, questionFromDB(q))
+	}
+
+	return questions, nil
+}
+
+func (s *QuizService) SaveQuizQuestions(ctx context.Context, reviewed Question, questions []Question) error {
+
+	if reviewed.ObjectiveID != 0 {
+		_, err := s.queries.CreateQuizQuestion(ctx, quiz.CreateQuizQuestionParams{
+			QuestionID:  pgtype.Int4{Int32: reviewed.ID, Valid: true},
+			ObjectiveID: pgtype.Int4{Int32: reviewed.ObjectiveID, Valid: true},
+			Status:      quiz.NullQuestionStatus{QuestionStatus: quiz.QuestionStatusReviewing, Valid: true},
+		})
+
+		if err != nil {
+			return fmt.Errorf("%w: %w", ErrDBFetch, err)
+		}
+
+		quizQuestion := makeBatchQuizQuestionExam(questions)
+		return s.queries.BatchQuizQuestionExam(ctx, quizQuestion)
+
+	} else {
+		_, err := s.queries.CreateQuizQuestion(ctx, quiz.CreateQuizQuestionParams{
+			QuestionID: pgtype.Int4{Int32: reviewed.ID, Valid: true},
+			SubjectID:  pgtype.Int4{Int32: reviewed.SubjectID, Valid: true},
+			Status:     quiz.NullQuestionStatus{QuestionStatus: quiz.QuestionStatusReviewing, Valid: true},
+		})
+
+		if err != nil {
+			return fmt.Errorf("%w: %w", ErrDBFetch, err)
+		}
+
+		quizQuestion := makeBatchQuizQuestionSubject(questions)
+		return s.queries.BatchQuizQuestionSubject(ctx, quizQuestion)
+	}
+
 }

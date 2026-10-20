@@ -45,8 +45,36 @@ func makeQuizRow(row quiz.GetQuestionsRow) QuizRow {
 	}
 }
 
-func makeBatchQuizQuestion(vals []Question) quiz.BatchQuizQuestionParams {
-	params := quiz.BatchQuizQuestionParams{}
+func makeBatchQuestions(vals []Question) quiz.BatchCreateQuestionParams {
+	params := quiz.BatchCreateQuestionParams{}
+
+	for _, val := range vals {
+		params.Question = append(params.Question, val.Question)
+		params.A = append(params.A, val.A)
+		params.B = append(params.B, val.B)
+		params.C = append(params.C, val.C)
+		params.D = append(params.D, val.D)
+		params.Answer = append(params.Answer, val.Answer)
+		params.SubjectIds = append(params.SubjectIds, val.SubjectID)
+	}
+
+	return params
+}
+
+func makeBatchQuizQuestionSubject(vals []Question) quiz.BatchQuizQuestionSubjectParams {
+	params := quiz.BatchQuizQuestionSubjectParams{}
+
+	for _, val := range vals {
+		// log.Printf("objective id %d", val.questionId)
+		params.SubjectIds = append(params.SubjectIds, val.SubjectID)
+		params.QuestionIds = append(params.QuestionIds, val.ID)
+		params.Status = append(params.Status, "pending")
+	}
+	return params
+}
+
+func makeBatchQuizQuestionExam(vals []Question) quiz.BatchQuizQuestionExamParams {
+	params := quiz.BatchQuizQuestionExamParams{}
 
 	for _, val := range vals {
 		// log.Printf("objective id %d", val.questionId)

@@ -22,11 +22,15 @@ func (s *StoreService) NewStore(ctx context.Context) (*Store, error) {
 	if err != nil {
 		return &Store{}, err
 	}
-	questions, questionExamId, err := s.fetchQuestions(ctx)
+	subjectIdText, subjectTextId, err := s.fetchSubjects(ctx)
 	if err != nil {
 		return &Store{}, err
 	}
-	quiz, err := s.fetchQuiz(ctx)
+	questions, questionExamId, questionSubjectId, err := s.fetchQuestions(ctx)
+	if err != nil {
+		return &Store{}, err
+	}
+	examQuiz, subjectQuiz, err := s.fetchQuiz(ctx)
 	if err != nil {
 		return &Store{}, err
 	}
@@ -47,6 +51,10 @@ func (s *StoreService) NewStore(ctx context.Context) (*Store, error) {
 	if err != nil {
 		return &Store{}, err
 	}
+	cidrGen, err := s.fetchAutogenScores(ctx)
+	if err != nil {
+		return &Store{}, err
+	}
 	scores, err := s.fetchScores(ctx)
 	if err != nil {
 		return &Store{}, err
@@ -57,18 +65,23 @@ func (s *StoreService) NewStore(ctx context.Context) (*Store, error) {
 	}
 
 	return &Store{
-		examIdCode:      examIdCode,
-		examCodeId:      examCodeId,
-		questions:       questions,
-		questionExamId:  questionExamId,
-		quiz:            quiz,
-		terms:           terms,
-		termExamId:      termExamId,
-		ports:           ports,
-		portScores:      portScores,
-		objectiveScores: objectiveScores,
-		scores:          scores,
-		matchingQuiz:    matchingQuiz,
+		examIdCode:        examIdCode,
+		examCodeId:        examCodeId,
+		subjectTextId:     subjectTextId,
+		subjectIdText:     subjectIdText,
+		questions:         questions,
+		questionExamId:    questionExamId,
+		questionSubjectId: questionSubjectId,
+		examQuiz:          examQuiz,
+		subjectQuiz:       subjectQuiz,
+		terms:             terms,
+		termExamId:        termExamId,
+		ports:             ports,
+		portScores:        portScores,
+		objectiveScores:   objectiveScores,
+		cidrGenerator:     &cidrGen,
+		scores:            scores,
+		matchingQuiz:      matchingQuiz,
 	}, nil
 
 }
@@ -84,8 +97,11 @@ func (s *StoreService) UpdateStoreOnQuestion(ctx context.Context, store *Store) 
 	if err != nil {
 		return nil, err
 	}
-
-	quiz, err := s.fetchQuiz(ctx)
+	cidrGen, err := s.fetchAutogenScores(ctx)
+	if err != nil {
+		return nil, err
+	}
+	examQuiz, subQuiz, err := s.fetchQuiz(ctx)
 
 	if err != nil {
 		return nil, err
@@ -93,7 +109,9 @@ func (s *StoreService) UpdateStoreOnQuestion(ctx context.Context, store *Store) 
 
 	store.scores = scores
 	store.objectiveScores = objectiveScores
-	store.quiz = quiz
+	store.examQuiz = examQuiz
+	store.subjectQuiz = subQuiz
+	store.cidrGenerator = &cidrGen
 	return store, nil
 }
 
@@ -115,13 +133,14 @@ func (s *StoreService) UpdateStoreOnQuiz(ctx context.Context, store *Store) (*St
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	quiz, err := s.fetchQuiz(ctx)
+	examQuiz, subQuiz, err := s.fetchQuiz(ctx)
 
 	if err != nil {
 		return nil, fmt.Errorf("%w : %w", ErrDBFetch, err)
 	}
 
-	store.quiz = quiz
+	store.examQuiz = examQuiz
+	store.subjectQuiz = subQuiz
 	return store, nil
 }
 
@@ -138,6 +157,7 @@ func (s *StoreService) UpdateStoreOnMatching(ctx context.Context, store *Store) 
 	store.matchingQuiz = matching
 	return store, nil
 }
+
 func (s *StoreService) fetchExamObjectives(ctx context.Context) (map[int32]float64, map[float64]int32, error) {
 	var examObjectives []ExamObjective
 	examIdCode := make(map[int32]float64)
@@ -164,12 +184,35 @@ func (s *StoreService) fetchExamObjectives(ctx context.Context) (map[int32]float
 	return examIdCode, examCodeId, nil
 }
 
-func (s *StoreService) fetchQuestions(ctx context.Context) (map[int32]Question, map[int32][]Question, error) {
-	questions := make(map[int32]Question)
-	questionExamId := make(map[int32][]Question)
-	questionDb, err := s.queries.GetAllQuestions(ctx)
+func (s *StoreService) fetchSubjects(ctx context.Context) (map[int32]string, map[string]int32, error) {
+	subjectIdText := make(map[int32]string)
+	subjectTextId := make(map[string]int32)
+
+	subjectDb, err := s.queries.GetAllSubjects(ctx)
+
 	if err != nil {
 		return nil, nil, fmt.Errorf("%w: %w", ErrDBFetch, err)
+	}
+
+	for _, sub := range subjectDb {
+		subjectIdText[sub.ID] = sub.Title
+		subjectTextId[sub.Title] = sub.ID
+	}
+
+	return subjectIdText, subjectTextId, nil
+}
+
+func (s *StoreService) fetchQuestions(ctx context.Context) (map[int32]Question, map[int32][]Question, map[int32][]Question, error) {
+	questions := make(map[int32]Question)
+	questionExamId := make(map[int32][]Question)
+	questionSubjectId := make(map[int32][]Question)
+	questionDb, err := s.queries.GetAllQuestions(ctx)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("%w: %w", ErrDBFetch, err)
+	}
+	subQuest, err := s.queries.GetAllSubjectQuestion(ctx)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("%w: %w", ErrDBFetch, err)
 	}
 
 	for _, q := range questionDb {
@@ -178,23 +221,36 @@ func (s *StoreService) fetchQuestions(ctx context.Context) (map[int32]Question, 
 		questionExamId[qe.ObjectiveID] = append(questionExamId[qe.ObjectiveID], qe)
 	}
 
-	return questions, questionExamId, nil
+	// fmt.Printf("len sub quest %d\n", len(subQuest))
+	for _, q := range subQuest {
+		qe := questionFromDB(q)
+		questions[qe.ID] = qe
+		questionSubjectId[qe.SubjectID] = append(questionSubjectId[qe.SubjectID], qe)
+		// fmt.Printf("%d\n", qe.SubjectID)
+	}
+
+	return questions, questionExamId, questionSubjectId, nil
 }
 
-func (s *StoreService) fetchQuiz(ctx context.Context) (map[int32][]Quiz, error) {
-	quizQuestions := make(map[int32][]Quiz)
+func (s *StoreService) fetchQuiz(ctx context.Context) (*QuizMap, *QuizMap, error) {
+	examQuiz := make(map[int32][]Quiz)
+	subQuiz := make(map[int32][]Quiz)
 	quizDb, err := s.queries.GetAllQuiz(ctx)
 
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrDBFetch, err)
+		return nil, nil, fmt.Errorf("%w: %w", ErrDBFetch, err)
 	}
 
 	for _, q := range quizDb {
 		qi := quizFromDB(q)
-		quizQuestions[qi.ObjectiveID] = append(quizQuestions[qi.ObjectiveID], qi)
+		if qi.ObjectiveID != 0 {
+			examQuiz[qi.ObjectiveID] = append(examQuiz[qi.ObjectiveID], qi)
+		} else {
+			subQuiz[qi.SubjectID] = append(subQuiz[qi.SubjectID], qi)
+		}
 	}
 
-	return quizQuestions, nil
+	return &QuizMap{data: examQuiz}, &QuizMap{data: subQuiz}, nil
 }
 
 func (s *StoreService) fetchTerms(ctx context.Context) (map[string]int32, map[string]int32, error) {
@@ -243,6 +299,35 @@ func (s *StoreService) fetchPortScores(ctx context.Context) (map[int32]Scorer, e
 	}
 
 	return portScores, nil
+}
+
+func (s *StoreService) fetchAutogenScores(ctx context.Context) (CidrGenerator, error) {
+	autogenScores := make(map[Generator]Scorer)
+	autogenDb, err := s.queries.GetAutoGenScores(ctx)
+
+	if err != nil {
+		return CidrGenerator{}, fmt.Errorf("%w: %w", ErrDBFetch, err)
+	}
+
+	for _, score := range autogenDb {
+		autoScoreFromDB(score, autogenScores)
+	}
+
+	for _, gen := range Generators {
+		_, ok := autogenScores[gen]
+
+		if !ok {
+			score := Score{
+				RightCount: 0,
+				WrongCount: 0,
+				Streak:     0,
+			}
+			var scorer Scorer = &score
+			autogenScores[gen] = scorer
+		}
+	}
+
+	return CidrGenerator{scoreMap: autogenScores}, nil
 }
 
 func (s *StoreService) fetchObjectiveScores(ctx context.Context) (map[int32]ObjectiveScore, error) {

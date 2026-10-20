@@ -3,6 +3,35 @@ INSERT INTO questions (objective_id, question, a, b, c, d, answer, term_id)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8) 
        RETURNING *;
 
+-- name: BatchCreateQuestion :many
+INSERT INTO questions (question, subject_id, a, b, c, d, answer) VALUES (
+    unnest(@question::text[]), 
+    unnest(@subject_ids::integer[]), 
+    unnest(@a::text[]),
+    unnest(@b::text[]),
+    unnest(@c::text[]),
+    unnest(@d::text[]),
+    unnest(@answer::text[])
+)
+RETURNING *;
+
+-- name: CreateSubjectQuestion :one
+INSERT INTO questions (subject_id, question, a, b, c, d, answer)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)
+       RETURNING *;
+
+-- name: GetSubjectIdByTitle :one
+SELECT id FROM subjects WHERE title = $1;
+
+-- name: CreateOrGetSubject :one
+INSERT INTO subjects (title) VALUES ($1)
+ON CONFLICT (title) DO UPDATE SET title = EXCLUDED.title
+RETURNING id;
+
+-- name: GetQuestionsBySubjectId :many
+SELECT question FROM questions
+                WHERE subject_id = $1;
+
 -- name: GetReviewedQuestions :many
 SELECT q.*, s.* FROM questions q
                   JOIN scores s ON s.question_id = q.id
@@ -55,6 +84,17 @@ INSERT INTO turns (question_id, turn) VALUES ($1,$2) RETURNING *;
 -- name: CreateOrUpdateTurn :exec
 INSERT INTO turns (question_id, turn) VALUES ($1, $2) ON CONFLICT (question_id) DO UPDATE SET turn = $2;
 
+-- name: UpdateAutogenScoreRight :exec 
+INSERT INTO autogen_scores (subject_id, question, right_count, wrong_count, streak) 
+VALUES ($1, $2, 1, 0, 1) 
+ON CONFLICT (question) DO UPDATE SET right_count = autogen_scores.right_count + 1, streak = autogen_scores.streak + 1;
+
+
+-- name: UpdateAutogenScoreWrong :exec 
+INSERT INTO autogen_scores (subject_id, question, right_count, wrong_count, streak) 
+VALUES ($1, $2, 0, 1, 0) 
+ON CONFLICT (question) DO UPDATE SET wrong_count = autogen_scores.wrong_count + 1, streak = 0;
+
 -- name: GetCurrentTurn :one 
 SELECT turn FROM state WHERE id = 1;
 
@@ -83,12 +123,20 @@ UPDATE objective_scores SET right_count = right_count + 1 WHERE objective_id = $
 UPDATE objective_scores SET wrong_count = wrong_count + 1 WHERE objective_id = $1 RETURNING *;
 
 -- name: CreateQuizQuestion :one
-INSERT INTO quiz (question_id, objective_id, status) VALUES ($1, $2, $3) RETURNING *;
+INSERT INTO quiz (question_id, objective_id, subject_id, status) VALUES ($1, $2, $3, $4) RETURNING *;
 
--- name: BatchQuizQuestion :exec 
+-- name: BatchQuizQuestionExam :exec 
 INSERT INTO quiz (question_id, objective_id, status) VALUES (
     unnest(@question_ids::integer[]), 
     unnest(@objective_ids::integer[]), 
+    unnest(@status::text[])::question_status
+);
+
+
+-- name: BatchQuizQuestionSubject :exec 
+INSERT INTO quiz (question_id, subject_id, status) VALUES (
+    unnest(@question_ids::integer[]), 
+    unnest(@subject_ids::integer[]), 
     unnest(@status::text[])::question_status
 );
 
@@ -105,6 +153,8 @@ UPDATE quiz SET status = 'answered' WHERE question_id = $1 RETURNING *;
 DELETE FROM quiz
 WHERE objective_id = $1;
 
+-- name: DeleteQuizWithSubjectId :exec 
+DELETE FROM quiz WHERE subject_id = $1;
 
 -- name: GetRandomQuestion :one
 SELECT q.id, q.question, q.a, q.b, q.c, q.d, q.answer, q.objective_id, q.term_id
@@ -183,6 +233,9 @@ SELECT * FROM exam_objectives;
 -- name: GetAllQuestions :many 
 SELECT q.* FROM questions q JOIN terms t ON t.id = q.term_id WHERE t.on_exam = true;
 
+-- name: GetAllSubjectQuestion :many
+SELECT * FROM questions WHERE subject_id IS NOT NULL;
+
 -- name: GetAllScores :many 
 SELECT * FROM scores;
 
@@ -203,6 +256,9 @@ SELECT * FROM matching_quiz;
 
 -- name: GetAllObjectiveScore :many
 SELECT * FROM objective_scores;
+
+-- name: GetAllSubjects :many 
+SELECT * FROM subjects;
 
 -- name: CreatePorts :exec 
 INSERT INTO ports (abbreviation, port, protocol) VALUES (
@@ -255,4 +311,6 @@ FROM questions q JOIN exam_objectives e ON e.id = q.objective_id
 LEFT JOIN scores s ON s.question_id = q.id
 GROUP BY e.code;
 
+-- name: GetAutoGenScores :many 
+SELECT * FROM autogen_scores;
 

@@ -47,5 +47,6 @@ next-env.d.ts
 # os
 Thumbs.db
 
+
 # server json files
 ser/**/*.json

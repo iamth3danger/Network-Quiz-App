@@ -54,6 +54,15 @@ func (ns NullQuestionStatus) Value() (driver.Value, error) {
 	return string(ns.QuestionStatus), nil
 }
 
+type AutogenScore struct {
+	ID         int32       `json:"id"`
+	SubjectID  pgtype.Int4 `json:"subject_id"`
+	Question   string      `json:"question"`
+	RightCount pgtype.Int4 `json:"right_count"`
+	WrongCount pgtype.Int4 `json:"wrong_count"`
+	Streak     pgtype.Int4 `json:"streak"`
+}
+
 type ExamObjective struct {
 	ID          int32  `json:"id"`
 	Code        string `json:"code"`
@@ -89,6 +98,7 @@ type PortScore struct {
 
 type Question struct {
 	ID          int32       `json:"id"`
+	SubjectID   pgtype.Int4 `json:"subject_id"`
 	ObjectiveID pgtype.Int4 `json:"objective_id"`
 	Question    string      `json:"question"`
 	A           string      `json:"a"`
@@ -103,6 +113,7 @@ type Quiz struct {
 	ID          int32              `json:"id"`
 	QuestionID  pgtype.Int4        `json:"question_id"`
 	ObjectiveID pgtype.Int4        `json:"objective_id"`
+	SubjectID   pgtype.Int4        `json:"subject_id"`
 	Status      NullQuestionStatus `json:"status"`
 }
 
@@ -118,6 +129,11 @@ type State struct {
 	ID          int32       `json:"id"`
 	Turn        int32       `json:"turn"`
 	ObjectiveID pgtype.Int4 `json:"objective_id"`
+}
+
+type Subject struct {
+	ID    int32  `json:"id"`
+	Title string `json:"title"`
 }
 
 type Term struct {

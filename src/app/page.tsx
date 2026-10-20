@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { apiUrl } from "@/lib/api";
+import { subjects } from "@/lib/subjects";
 
 interface Objective {
   code: string;
@@ -185,6 +186,23 @@ export default function Home() {
             Match port numbers to protocols
           </span>
         </Link>
+
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold text-gray-300 border-b border-gray-700 pb-2 mb-3">
+            Subjects
+          </h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {subjects.map((subject) => (
+              <Link
+                key={subject.slug}
+                href={`/subject/${subject.slug}`}
+                className="p-3 bg-gray-800 rounded-lg border border-gray-700 hover:border-blue-500 transition-colors text-blue-400 text-sm font-medium"
+              >
+                {subject.label}
+              </Link>
+            ))}
+          </div>
+        </div>
 
         {domains.map((domain) => {
           const domainObjectives = objectives.filter(

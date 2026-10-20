@@ -2,11 +2,12 @@ package services
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"reflect"
 	"regexp"
 	"strconv"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 type mockScorer struct {
@@ -204,6 +205,31 @@ func extractCIDRPrefix(cidr string) (int, error) {
 	return prefix, nil
 }
 
+func TestGenerateQuizFromSubject(t *testing.T) {
+	questionSubjectId := make(map[int32][]Question)
+	subjectTextId := make(map[string]int32)
+	scores := make(map[int32]Scorer)
+	questionSubjectId[2] = []Question{{ID: 1}, {ID: 2}, {ID: 3}, {ID: 4}, {ID: 5}}
+	subjectTextId["mock"] = 2
+	scores[1] = mockScorer{id: 1, wrong: 2}
+	scores[2] = mockScorer{id: 2, right: 3}
+	scores[3] = mockScorer{id: 3, right: 4}
+	scores[4] = mockScorer{id: 4, wrong: 5}
+	scores[5] = mockScorer{id: 4, right: 5}
+
+	store := &Store{
+		questionSubjectId: questionSubjectId,
+		scores:            scores,
+		subjectTextId:     subjectTextId,
+	}
+
+	_, err := store.GenerateQuizFromSubject("mock")
+
+	if err != nil {
+		t.Fatalf("generating quiz %v", err)
+	}
+}
+
 func extractSubnetMask(s string) string {
 	re := regexp.MustCompile(`\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b`)
 	matches := re.FindStringSubmatch(s)
@@ -230,7 +256,9 @@ func TestCidrToSubnet(t *testing.T) {
 }
 
 func TestIPConversionQuestion(t *testing.T) {
-	question, err := iPCidrConversionQuestion(IPCidrToNetwork, "network")
+	question, err := iPCidrConversionQuestion(IPCidrToNetwork, func(s string, i int32) string {
+		return fmt.Sprintf("%s/%d", s, i)
+	})
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -255,7 +283,7 @@ func TestIPConversionQuestion(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 
-	net, err := DottedDecimal(IPCidrToNetwork(ip, cidr)).string()
+	net, err := IPCidrToNetwork(ip, cidr)
 
 	assertSubnet(net, answerStr, t)
 }
@@ -312,7 +340,7 @@ func TestIPCidrToNetwork(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
-	network, err := DottedDecimal(IPCidrToNetwork(ip, 28)).string()
+	network, err := IPCidrToNetwork(ip, 28)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -322,7 +350,7 @@ func TestIPCidrToNetwork(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
-	network, err = DottedDecimal(IPCidrToNetwork(ip, 23)).string()
+	network, err = IPCidrToNetwork(ip, 23)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -332,7 +360,7 @@ func TestIPCidrToNetwork(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
-	network, err = DottedDecimal(IPCidrToNetwork(ip, 21)).string()
+	network, err = IPCidrToNetwork(ip, 21)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -342,7 +370,7 @@ func TestIPCidrToNetwork(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
-	network, err = DottedDecimal(IPCidrToNetwork(ip, 5)).string()
+	network, err = IPCidrToNetwork(ip, 5)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -352,7 +380,7 @@ func TestIPCidrToNetwork(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
-	network, err = DottedDecimal(IPCidrToNetwork(ip, 9)).string()
+	network, err = IPCidrToNetwork(ip, 9)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -362,7 +390,7 @@ func TestIPCidrToNetwork(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
-	network, err = DottedDecimal(IPCidrToNetwork(ip, 12)).string()
+	network, err = IPCidrToNetwork(ip, 12)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -372,7 +400,7 @@ func TestIPCidrToNetwork(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
-	network, err = DottedDecimal(IPCidrToNetwork(ip, 18)).string()
+	network, err = IPCidrToNetwork(ip, 18)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -382,7 +410,7 @@ func TestIPCidrToNetwork(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
-	network, err = DottedDecimal(IPCidrToNetwork(ip, 24)).string()
+	network, err = IPCidrToNetwork(ip, 24)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -395,7 +423,7 @@ func TestIPCidrToBroadcast(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
-	broadcast, err := DottedDecimal(IPCidrToBroadcast(ip, 28)).string()
+	broadcast, err := IPCidrToBroadcast(ip, 28)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -404,7 +432,7 @@ func TestIPCidrToBroadcast(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
-	broadcast, err = DottedDecimal(IPCidrToBroadcast(ip, 23)).string()
+	broadcast, err = IPCidrToBroadcast(ip, 23)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -414,7 +442,7 @@ func TestIPCidrToBroadcast(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
-	broadcast, err = DottedDecimal(IPCidrToBroadcast(ip, 21)).string()
+	broadcast, err = IPCidrToBroadcast(ip, 21)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -424,7 +452,7 @@ func TestIPCidrToBroadcast(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
-	broadcast, err = DottedDecimal(IPCidrToBroadcast(ip, 9)).string()
+	broadcast, err = IPCidrToBroadcast(ip, 9)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -434,7 +462,7 @@ func TestIPCidrToBroadcast(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
-	broadcast, err = DottedDecimal(IPCidrToBroadcast(ip, 12)).string()
+	broadcast, err = IPCidrToBroadcast(ip, 12)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -444,7 +472,7 @@ func TestIPCidrToBroadcast(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
-	broadcast, err = DottedDecimal(IPCidrToBroadcast(ip, 18)).string()
+	broadcast, err = IPCidrToBroadcast(ip, 18)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -454,7 +482,7 @@ func TestIPCidrToBroadcast(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
-	broadcast, err = DottedDecimal(IPCidrToBroadcast(ip, 24)).string()
+	broadcast, err = IPCidrToBroadcast(ip, 24)
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -492,7 +520,7 @@ func checkUniqueDotted(decimals []string) bool {
 
 func TestGenOptions(t *testing.T) {
 	for range 10000 {
-		cidrs := genCidersFromRandomRange()
+		cidrs := generateCidrs(3)
 		if !checkUnique(cidrs) {
 			t.Fatalf("duplicate values!")
 		}
@@ -508,6 +536,65 @@ func TestGetConvChoices(t *testing.T) {
 		if !checkUniqueDotted(ch.addresses) {
 			t.Fatalf("duplicate values!")
 		}
-
 	}
+
+}
+
+func TestQuestionToGenerator(t *testing.T) {
+	generator, err := questionToGenerator("What is /6 in dotted decimal?")
+
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	if generator != GeneratorSubnet {
+		t.Fatalf("expected %s : actual %s", GeneratorSubnet, generator)
+	}
+
+	generator, err = questionToGenerator("what is 52.91.41.98/23 as a broadcast address")
+
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	if generator != GeneratorBroadcast {
+		t.Fatalf("expected %s : actual %s", GeneratorSubnet, generator)
+	}
+
+	generator, err = questionToGenerator("Convert 255.248.0.0 to CIDR")
+
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	if generator != GeneratorCidr {
+		t.Fatalf("expected %s : actual %s", GeneratorSubnet, generator)
+	}
+
+	generator, err = questionToGenerator("How many usable hosts does /30 have?")
+
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	if generator != GeneratorHost {
+		t.Fatalf("expected %s : actual %s", GeneratorSubnet, generator)
+	}
+
+	generator, err = questionToGenerator("what is 92.132.124.60/7 as a network address?")
+
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+
+	if generator != GeneratorNetwork {
+		t.Fatalf("expected %s : actual %s", GeneratorSubnet, generator)
+	}
+
+	generator, err = questionToGenerator("")
+
+	if err == nil {
+		t.Fatalf("there should be an error here!")
+	}
+
 }

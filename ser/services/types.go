@@ -11,9 +11,11 @@ type ExamObject struct {
 }
 
 type QuestionRequest struct {
-	QuestionID      int  `json:"question_id"`
-	Correct         bool `json:"correct"`
-	ExamObjectiveID int  `json:"exam_objective_id"`
+	Question        string `json:"question"`
+	QuestionID      int    `json:"question_id"`
+	Correct         bool   `json:"correct"`
+	ExamObjectiveID int    `json:"exam_objective_id"`
+	SubjectID       int    `json:"subject_id"`
 }
 
 type MatchingRequest struct {
@@ -63,6 +65,18 @@ func examFromDB(examDb quiz.ExamObjective) ExamObjective {
 		ID:          examDb.ID,
 		Code:        examDb.Code,
 		Description: examDb.Description,
+	}
+}
+
+type Subject struct {
+	ID    int32  `json:"id"`
+	Title string `json:"title"`
+}
+
+func subjectFromDB(subDb quiz.Subject) Subject {
+	return Subject{
+		ID:    subDb.ID,
+		Title: subDb.Title,
 	}
 }
 
