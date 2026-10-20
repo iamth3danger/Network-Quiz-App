@@ -17,6 +17,12 @@ const titles: [title: string, label: string][] = [
   ["dns records", "DNS Records"],
   ["switch errors", "Switch Errors"],
   ["tcp flags", "TCP Flags"],
+  ["cli tools", "CLI Tools"],
+  ["ipv6", "IPv6"],
+  ["pdu", "PDUs"],
+  ["wireless data", "Wireless Data"],
+  ["network device features", "Network Device Features"],
+  ["network storage", "Network Storage"],
 ];
 
 export const subjects: Subject[] = titles.map(([title, label]) => ({
